@@ -241,7 +241,7 @@
   function syncTable() {
     const vis = STATIONS.filter((s) => state.visible.has(s.id));
     const cols = D.order.filter((p) => vis.some((st) => st.sensors.some((sid) => SENS[sid].p === p)));
-    if (!vis.length) { table.innerHTML = '<tr><td class="empty">Nessuna centralina selezionata.</td></tr>'; return; }
+    if (!vis.length) { table.innerHTML = '<tr><td class="empty">Nessuna centralina selezionata.</td></tr>'; $('#thr').innerHTML = ''; return; }
     let h = '<thead><tr><th>Centralina</th>' + cols.map((p) => `<th>${POLL[p].label}<small>${metricLabel(p)}</small></th>`).join('') + '</tr></thead><tbody>';
     for (const st of vis) {
       const { rows } = stationDay(st, state.day);
@@ -293,8 +293,18 @@
     return days;
   }
   function syncChart() {
-    const st = stById[state.sel];
     const tabs = $('#poltabs'); tabs.innerHTML = '';
+    // il grafico segue le centraline visibili: se quella selezionata è nascosta passa alla prima visibile
+    if (!state.visible.has(state.sel)) state.sel = STATIONS.find((s) => state.visible.has(s.id))?.id ?? null;
+    const st = stById[state.sel];
+    if (!st) {
+      $('#h-chart').textContent = 'Andamento';
+      $('#chart-range').textContent = ''; $('#stats').innerHTML = '';
+      const empty = $('#chart-empty'), box = $('.chartbox');
+      empty.hidden = false; empty.textContent = 'Seleziona almeno una centralina per vedere l\'andamento.'; box.hidden = true;
+      if (chart) { chart.destroy(); chart = null; }
+      return;
+    }
     const pcodes = D.order.filter((p) => st.sensors.some((sid) => SENS[sid].p === p));
     if (!pcodes.includes(state.pol)) state.pol = pcodes[0];
     for (const p of pcodes) {
