@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Mappa delle centraline ARPA Lombardia in provincia di Pavia, dalla Lomellina all'Oltrepò: valori giornalieri degli ultimi dieci anni, superamenti dei limiti, andamento per stazione. Progetto indipendente.">
+<meta name="color-scheme" content="light dark">
+<title>Aria del Pavese · centraline ARPA in provincia di Pavia</title>
+<meta name="robots" content="noindex">  <!-- TODO go-live: rimuovere questa riga quando la pagina è pronta per essere trovata dai motori di ricerca -->
+<link rel="icon" type="image/svg+xml" href="logo.svg">
+<link rel="stylesheet" href="fonts/fonts.css">
+<link rel="stylesheet" href="vendor/leaflet.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <img class="logo" src="logo.svg" alt="" width="44" height="44">
+    <div>
+    <p class="eyebrow">Dati ARPA Lombardia · Qualità dell'aria · Provincia di Pavia</p>
+    <h1>Aria del Pavese</h1>
+    <p class="lede" id="lede">Tutte le centraline della provincia di Pavia, dalla Lomellina all'Oltrepò: valori giornalieri degli ultimi dieci anni, con i superamenti dei limiti di legge in evidenza. Progetto indipendente, non un sito ufficiale.</p>
+    </div>
+  </div>
+  <div class="today" id="today" aria-live="polite"></div>
+</header>
+
+<div class="work">
+  <aside>
+    <section class="panel" aria-labelledby="h-date">
+      <div class="ph"><h2 id="h-date">Data</h2><span class="eyebrow" id="dow"></span></div>
+      <div class="pb">
+        <div class="date-row">
+          <button class="nav" id="prev" title="Giorno precedente" aria-label="Giorno precedente">‹</button>
+          <select id="sel-y" aria-label="Anno"></select>
+          <select id="sel-m" aria-label="Mese"></select>
+          <select id="sel-d" aria-label="Giorno"></select>
+          <button class="nav" id="next" title="Giorno successivo" aria-label="Giorno successivo">›</button>
+        </div>
+        <div class="quick">
+          <button class="chip" id="q-last">Ultimo giorno</button>
+          <button class="chip" id="q-ym1">Un anno prima</button>
+          <button class="chip" id="q-worst">Peggior giorno dell'anno</button>
+        </div>
+        <p class="hint" id="date-hint"></p>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="h-st">
+      <div class="ph"><h2 id="h-st">Centraline</h2>
+        <div class="list-actions"><button id="st-all">Tutte</button><button id="st-none">Nessuna</button><button id="st-active">Solo attive</button></div>
+      </div>
+      <ul class="stlist" id="stlist"></ul>
+    </section>
+  </aside>
+
+  <main>
+    <section class="panel" aria-label="Mappa">
+      <div class="ph">
+        <h2 id="map-title">Mappa</h2>
+        <div class="legend"><span><i class="crit"></i>Oltre il limite di legge</span><span><i class="warn"></i>Oltre il riferimento OMS</span><span><i class="ok"></i>Entro i limiti</span><span><i class="nd"></i>Nessun dato</span></div>
+      </div>
+      <div class="ph maptools"><label class="chip osm"><input type="checkbox" id="osm"> Sfondo OpenStreetMap</label><span class="hint" style="margin:0">Senza sfondo la mappa è vettoriale: confini comunali ISTAT, niente strade né fiumi.</span></div>
+      <div id="map" role="region" aria-label="Mappa della provincia di Pavia con le centraline"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="h-vals">
+      <div class="ph"><h2 id="h-vals">Valori del giorno</h2><span class="hint" style="margin:0" id="vals-note">Clicca una riga per il grafico · ◐ = giornata con meno di 18 ore valide</span></div>
+      <div class="tblwrap"><table class="vals" id="vals"></table></div>
+      <div class="pb"><div class="thresholds" id="thr"></div></div>
+    </section>
+
+    <section class="panel" aria-labelledby="h-chart">
+      <div class="ph chart-head">
+        <h2 id="h-chart">Andamento</h2>
+        <div class="seg" role="group" aria-label="Periodo">
+          <button data-per="week" aria-pressed="true">Settimana</button><button data-per="month">Mese</button><button data-per="year">Anno</button>
+        </div>
+      </div>
+      <div class="pb">
+        <div class="chart-head"><div class="poltabs" id="poltabs" role="tablist"></div><span class="hint" id="chart-range" style="margin:0"></span></div>
+        <div class="stats" id="stats"></div>
+        <div class="chartbox"><canvas id="chart" aria-label="Grafico dell'andamento"></canvas></div>
+        <div class="empty" id="chart-empty" hidden></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<footer>
+  <p><b>Fonte</b>: ARPA Lombardia, open data su <a href="https://www.dati.lombardia.it" target="_blank" rel="noopener">dati.lombardia.it</a> (dataset «Stazioni qualità dell'aria», «Dati sensori aria 2010-2017», «Dati sensori aria dal 2018», «Dati sensori aria»), licenza IODL 2.0. Sono usati solo i valori con stato «validato» (VA). Confini comunali ISTAT (via openpolis/geojson-italy). <span id="gen"></span></p>
+  <p><b>Aggregazione</b>: un valore per sensore e per giorno solare. PM10, PM2.5, SO₂, benzene, NH₃, NOₓ e black carbon: media giornaliera; NO₂ e SO₂: anche massimo orario; O₃ e CO: massimo giornaliero della media mobile su 8 ore (calcolata con almeno 6 ore su 8). I giorni con meno di 18 ore valide su 24 sono segnati come parziali. I limiti sono quelli del D.Lgs. 155/2010 (direttiva 2008/50/CE); per il PM2.5, che ha solo un limite annuale (25 µg/m³), la soglia giornaliera mostrata è la linea guida OMS 2021 (15 µg/m³) e non un limite di legge. La direttiva (UE) 2024/2881 introduce dal 2030 limiti più severi (PM10 45, PM2.5 25 sulla media giornaliera, NO₂ 50 sulla media giornaliera).</p>
+  <p><b>Nota</b>: i dati vengono riscaricati automaticamente ogni notte da GitHub Actions (anno corrente e precedente) e la pagina mostra una finestra mobile degli ultimi dieci anni solari; la data dell'ultimo aggiornamento è indicata sopra. Per alcuni sensori il 2025 non è presente nell'open data (Mezzana Bigli, PM2.5 Parona, NH₃ e PM2.5 Pavia Folperti); la stazione di Pavia via Folperti non pubblica dati dal 5 febbraio 2026.</p>
+  <p><b>Avvertenze</b>: questo è un progetto indipendente e non è affiliato ad ARPA Lombardia, a Regione Lombardia né ad alcun ente locale. Le aggregazioni giornaliere, i conteggi dei superamenti e la media mobile su 8 ore sono elaborazioni proprie dei dati validati ARPA e possono differire dalle statistiche ufficiali; per qualsiasi uso ufficiale, legale o sanitario fare riferimento ad ARPA Lombardia. Le informazioni sono fornite così come sono, senza garanzia di completezza o esattezza.</p>
+  <p><b>Privacy</b>: la pagina non usa cookie né strumenti di tracciamento e non raccoglie dati personali; le preferenze (data, centraline, stazione) restano nel browser del visitatore. Font e librerie sono serviti insieme alla pagina. Solo attivando lo sfondo OpenStreetMap il browser richiede le mappe ai server di OpenStreetMap, che ricevono l'indirizzo IP del visitatore secondo la loro <a href="https://osmfoundation.org/wiki/Privacy_Policy" target="_blank" rel="noopener">informativa</a>.</p>
+  <p><b>Codice e licenza</b>: sorgenti su GitHub (licenza MIT); dati ARPA con licenza IODL 2.0, rielaborati come descritto sopra. <a href="https://github.com/danbas/aria-del-pavese" id="repo-link" target="_blank" rel="noopener">Repository</a>.</p>
+</footer>
+
+<script src="vendor/leaflet.js"></script>
+<script src="vendor/chart.umd.js"></script>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

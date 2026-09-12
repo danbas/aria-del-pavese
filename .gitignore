@@ -1,0 +1,4 @@
+site/data.js
+data/open/
+__pycache__/
+.DS_Store
