@@ -112,7 +112,7 @@ written by Claude and reviewed before publishing.
 
 ## Licenses
 
-Code and page: [MIT](LICENSE). ARPA Lombardia data via Regione Lombardia Open Data: IODL 2.0, reprocessed as described above.
+Code and page: [MIT](LICENSE). ARPA Lombardia data via Regione Lombardia Open Data: CC0 1.0 (public domain), attribution "ARPA LOMBARDIA" as stated in the dataset metadata; reprocessed as described above.
 ISTAT boundaries via [openpolis/geojson-italy](https://github.com/openpolis/geojson-italy): CC BY 4.0. Leaflet (BSD-2),
 Chart.js (MIT), IBM Plex (OFL 1.1). Optional background tiles © OpenStreetMap contributors (ODbL). Details in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

@@ -115,7 +115,7 @@ metriche normative e architettura sono state discusse in conversazione; il codic
 
 ## Licenze
 
-Codice e pagina: [MIT](LICENSE). Dati ARPA Lombardia via Regione Lombardia Open Data: IODL 2.0, rielaborati come descritto
-sopra. Confini ISTAT via [openpolis/geojson-italy](https://github.com/openpolis/geojson-italy): CC BY 4.0. Leaflet (BSD-2),
+Codice e pagina: [MIT](LICENSE). Dati ARPA Lombardia via Regione Lombardia Open Data: licenza CC0 1.0 (pubblico dominio), attribuzione
+«ARPA LOMBARDIA» come indicato nei metadati dei dataset; rielaborati come descritto sopra. Confini ISTAT via [openpolis/geojson-italy](https://github.com/openpolis/geojson-italy): CC BY 4.0. Leaflet (BSD-2),
 Chart.js (MIT), IBM Plex (OFL 1.1). Tile di sfondo opzionali © OpenStreetMap contributors (ODbL). Dettagli in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
