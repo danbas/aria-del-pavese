@@ -10,6 +10,8 @@ every night. The user interface is in Italian.
 
 <br clear="left">
 
+**Live site:** <https://danbas.github.io/aria-del-pavese/>
+
 > **Independent project.** This is not an official site and is not affiliated with ARPA Lombardia, Regione Lombardia or any
 > local authority. The computations are the project's own; for official purposes refer to ARPA data.
 
@@ -44,12 +46,12 @@ what the province's stations measured, flags the days above the limits, and lets
 3. In **Settings → Actions → General → Workflow permissions** choose *Read and write permissions* (needed for the automatic data commit).
 4. Optional: add a `SOCRATA_APP_TOKEN` secret (free token from the developer settings on dati.lombardia.it) to avoid API throttling.
    It works without one.
-5. Run the workflow from **Actions → Aggiorna dati ARPA e pubblica → Run workflow**. The site will be at `https://danbas.github.io/aria-del-pavese/`.
+5. Run the workflow from **Actions → Aggiorna dati ARPA e pubblica → Run workflow**. The site will be at `https://<user>.github.io/<repo-name>/`.
 
 Every run — including the one triggered by the push — downloads the current and previous year (5 API calls, under a minute) and rebuilds the site.
 
-**Before going live**, one line to remove in `site/index.html`: the `<meta name="robots" content="noindex">`, kept until the
-site has been verified online.
+During the first tests it is worth adding `<meta name="robots" content="noindex">` to `site/index.html`, to be removed at go-live,
+so the page is not indexed before it has been verified online.
 
 ## Local use
 

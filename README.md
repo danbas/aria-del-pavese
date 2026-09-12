@@ -9,6 +9,8 @@ superamenti dei limiti di legge in evidenza, andamento per stazione su settimana
 
 <br clear="left">
 
+**Sito pubblicato:** <https://danbas.github.io/aria-del-pavese/>
+
 > **Progetto indipendente.** Non è un sito ufficiale e non è affiliato ad ARPA Lombardia, a Regione Lombardia né ad alcun ente
 > locale. Le elaborazioni sono proprie del progetto; per usi ufficiali fare riferimento ai dati ARPA.
 
@@ -45,12 +47,12 @@ seguire l'andamento di una stazione nel tempo.
 3. In **Settings → Actions → General → Workflow permissions** scegli *Read and write permissions* (serve per il commit automatico dei dati).
 4. Facoltativo: aggiungi il secret `SOCRATA_APP_TOKEN` (token gratuito dalle impostazioni sviluppatore di dati.lombardia.it) per
    evitare il throttling dell'API. Senza token funziona comunque.
-5. Lancia il workflow da **Actions → Aggiorna dati ARPA e pubblica → Run workflow**. Il sito sarà su `https://danbas.github.io/aria-del-pavese/`.
+5. Lancia il workflow da **Actions → Aggiorna dati ARPA e pubblica → Run workflow**. Il sito sarà su `https://<utente>.github.io/<nome-repo>/`.
 
 Ogni run — anche quello scatenato dal push — scarica anno corrente e precedente (5 chiamate API, meno di un minuto) e ricostruisce il sito.
 
-**Prima del go-live**, una riga da rimuovere in `site/index.html`: il `<meta name="robots" content="noindex">`, da tenere finché
-non si è verificato che tutto funzioni online.
+Durante i primi test conviene aggiungere `<meta name="robots" content="noindex">` in `site/index.html`, da togliere al go-live,
+così la pagina non viene indicizzata prima di essere stata verificata online.
 
 ## Uso locale
 
