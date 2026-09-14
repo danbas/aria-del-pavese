@@ -409,6 +409,27 @@
     });
     return pdfLibsPromise;
   }
+  const SITE_URL = 'https://danbas.github.io/aria-del-pavese/';
+  let logoPngPromise = null;
+  // jsPDF non supporta SVG nativamente: il logo viene rasterizzato una sola volta (via canvas)
+  // e incorporato come PNG nell'intestazione della prima pagina del report.
+  function loadLogoPng() {
+    if (logoPngPromise) return logoPngPromise;
+    logoPngPromise = new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const size = 128;
+        const canvas = document.createElement('canvas');
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, size, size);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.onerror = () => resolve(null);
+      img.src = 'logo.svg';
+    });
+    return logoPngPromise;
+  }
   const repPolsBox = $('#rep-pols'), repGo = $('#rep-go'), repStatus = $('#rep-status');
   function syncReportPanel() {
     const st = stById[state.sel];
@@ -456,13 +477,16 @@
     const prevLabel = repGo.textContent;
     repGo.disabled = true; repGo.textContent = 'Generazione…'; repStatus.textContent = '';
     try {
-      await loadPdfLibs();
+      const [, logoPng] = await Promise.all([loadPdfLibs(), loadLogoPng()]);
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF({ unit: 'pt', format: 'a4', compress: true });
       const pageW = doc.internal.pageSize.getWidth();
       const M = 40; let y = M;
+      const LOGO = 24;
+      const titleX = logoPng ? M + LOGO + 8 : M;
+      if (logoPng) doc.addImage(logoPng, 'PNG', M, y - LOGO + 6, LOGO, LOGO);
       doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor(LIGHT.ink);
-      doc.text('Aria del Pavese', M, y); y += 20;
+      doc.text('Aria del Pavese', titleX, y); y += 20;
       doc.setFont('helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor(LIGHT.ink2);
       doc.text(st.name + ' — ' + st.comune, M, y); y += 16;
       const days0 = periodDays(state.day, state.per);
@@ -470,8 +494,11 @@
       doc.text(perLabel + ': ' + fmtLong(days0[0]) + ' – ' + fmtLong(days0[days0.length - 1]), M, y); y += 16;
       doc.setFontSize(9); doc.setTextColor(LIGHT.muted);
       doc.text('Generato il ' + new Date().toISOString().slice(0, 10) + ' · dati ARPA scaricati il ' + D.generated.slice(0, 10), M, y); y += 14;
+      doc.setTextColor(LIGHT.accent);
+      doc.textWithLink(SITE_URL.replace(/^https:\/\//, ''), M, y, { url: SITE_URL }); y += 16;
       if (blocks.meta) {
-        const note = 'Fonte: ARPA Lombardia, open data su dati.lombardia.it, licenza CC0 1.0 (pubblico dominio), attribuzione «ARPA LOMBARDIA». Sono usati solo i valori con stato «validato» (VA). I limiti sono quelli del D.Lgs. 155/2010; per il PM2.5, che ha solo un limite annuale, la soglia giornaliera mostrata è la linea guida OMS 2021 (15 µg/m³) e non un limite di legge. Le aggregazioni giornaliere e i conteggi dei superamenti sono elaborazioni proprie di questo progetto indipendente, non affiliato ad ARPA Lombardia; per usi ufficiali fare riferimento ad ARPA. Sito: danbas.github.io/aria-del-pavese/';
+        const note = 'Fonte: ARPA Lombardia, open data su dati.lombardia.it, licenza CC0 1.0 (pubblico dominio), attribuzione «ARPA LOMBARDIA». Sono usati solo i valori con stato «validato» (VA). I limiti sono quelli del D.Lgs. 155/2010; per il PM2.5, che ha solo un limite annuale, la soglia giornaliera mostrata è la linea guida OMS 2021 (15 µg/m³) e non un limite di legge. Le aggregazioni giornaliere e i conteggi dei superamenti sono elaborazioni proprie di questo progetto indipendente, non affiliato ad ARPA Lombardia; per usi ufficiali fare riferimento ad ARPA.';
+        doc.setTextColor(LIGHT.muted);
         const lines = doc.splitTextToSize(pdfSafe(note), pageW - 2 * M);
         doc.setFontSize(8.5); doc.text(lines, M, y); y += lines.length * 10 + 6;
       }
@@ -521,6 +548,16 @@
           });
           y = doc.lastAutoTable.finalY + 16;
         }
+      }
+
+      // piè di pagina su ogni pagina: utile se il PDF viene stampato o le pagine separate.
+      const pageH = doc.internal.pageSize.getHeight();
+      const totalPages = doc.internal.getNumberOfPages();
+      for (let pg = 1; pg <= totalPages; pg++) {
+        doc.setPage(pg);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(LIGHT.muted);
+        doc.textWithLink('Aria del Pavese · ' + SITE_URL.replace(/^https:\/\//, ''), M, pageH - 20, { url: SITE_URL });
+        doc.text('pag. ' + pg + ' di ' + totalPages, pageW - M, pageH - 20, { align: 'right' });
       }
 
       const fname = 'aria-pavese_' + slugify(st.name) + '_' + state.per + '_' + state.day + '.pdf';

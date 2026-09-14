@@ -73,7 +73,7 @@ One value per sensor per calendar day (date of the ARPA timestamp), using only r
 - **hourly maximum** for NO₂ (and SO₂, for the 350 µg/m³ hourly limit);
 - **daily maximum of the 8-hour running mean** for O₃ and CO (a window is valid with at least 6 of 8 hours).
 
-Days with fewer than 18 valid hours are marked as partial. Thresholds are those of Italian Legislative Decree 155/2010
+Days with fewer than 18 valid hours are marked as partial. The "validated" (`VA`) status is an automatic per-reading quality check, not a certificate that the data is final: current-year data (and, until March 30, the previous year's) remain provisional and ARPA can still revise them retroactively. Thresholds are those of Italian Legislative Decree 155/2010
 (Directive 2008/50/EC). PM2.5 only has an annual limit (25 µg/m³): as a daily threshold the WHO 2021 guideline (15 µg/m³) is used,
 labelled as a WHO reference rather than a legal limit. Directive (EU) 2024/2881 will introduce stricter limits from 2030.
 
