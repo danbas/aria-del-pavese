@@ -18,6 +18,7 @@
   const clampDay = (s) => (s < MIN_DAY ? MIN_DAY : s > MAX_DAY ? MAX_DAY : s);
   const dayIndex = (s) => { const d = toDate(s); return { y: d.getUTCFullYear(), i: Math.round((d - Date.UTC(d.getUTCFullYear(), 0, 1)) / 864e5) }; };
   const fmtLong = (s) => { const d = toDate(s); return DOWS[d.getUTCDay()] + ' ' + d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()] + ' ' + d.getUTCFullYear(); };
+  const fmtDMY = (s) => { const [y, m, d] = s.split('-'); return d + '/' + m + '/' + y; };
   const fmtShort = (s) => { const d = toDate(s); return d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()].slice(0, 3); };
 
   // ---------- data access ----------
@@ -487,13 +488,30 @@
       if (logoPng) doc.addImage(logoPng, 'PNG', M, y - LOGO + 6, LOGO, LOGO);
       doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor(LIGHT.ink);
       doc.text('Aria del Pavese', titleX, y); y += 20;
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor(LIGHT.ink2);
-      doc.text('Centralina: ' + st.name + ' — ' + st.comune, M, y); y += 16;
+      doc.setFontSize(11); doc.setTextColor(LIGHT.ink2);
+      {
+        let x = M;
+        doc.setFont('helvetica', 'normal'); doc.text('Centralina: "', x, y); x += doc.getTextWidth('Centralina: "');
+        doc.setFont('helvetica', 'italic'); doc.text(st.name, x, y); x += doc.getTextWidth(st.name);
+        doc.setFont('helvetica', 'normal'); doc.text('" — ', x, y); x += doc.getTextWidth('" — ');
+        doc.setFont('helvetica', 'bold'); doc.text(st.comune, x, y);
+        doc.setFont('helvetica', 'normal');
+      }
+      y += 16;
       const days0 = periodDays(state.day, state.per);
       const perLabel = state.per === 'week' ? 'Settimana' : state.per === 'month' ? 'Mese' : 'Anno';
-      doc.text(perLabel + ': ' + fmtLong(days0[0]) + ' – ' + fmtLong(days0[days0.length - 1]), M, y); y += 16;
+      {
+        let x = M;
+        doc.setFont('helvetica', 'bold'); doc.text(perLabel, x, y); x += doc.getTextWidth(perLabel);
+        doc.setFont('helvetica', 'normal'); doc.text(': ', x, y); x += doc.getTextWidth(': ');
+        doc.setFont('helvetica', 'bold'); doc.text(fmtDMY(days0[0]), x, y); x += doc.getTextWidth(fmtDMY(days0[0]));
+        doc.setFont('helvetica', 'normal'); doc.text(' – ', x, y); x += doc.getTextWidth(' – ');
+        doc.setFont('helvetica', 'bold'); doc.text(fmtDMY(days0[days0.length - 1]), x, y);
+        doc.setFont('helvetica', 'normal');
+      }
+      y += 16;
       doc.setFontSize(9); doc.setTextColor(LIGHT.muted);
-      doc.text('Generato il ' + new Date().toISOString().slice(0, 10) + ' · dati ARPA scaricati il ' + D.generated.slice(0, 10), M, y); y += 14;
+      doc.text('Generato il ' + fmtDMY(new Date().toISOString().slice(0, 10)) + ' · dati ARPA scaricati il ' + fmtDMY(D.generated.slice(0, 10)), M, y); y += 14;
       doc.setTextColor(LIGHT.accent);
       doc.textWithLink(SITE_URL.replace(/^https:\/\//, ''), M, y, { url: SITE_URL }); y += 16;
       if (blocks.meta) {
