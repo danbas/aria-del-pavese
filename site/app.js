@@ -488,7 +488,7 @@
       doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor(LIGHT.ink);
       doc.text('Aria del Pavese', titleX, y); y += 20;
       doc.setFont('helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor(LIGHT.ink2);
-      doc.text(st.name + ' — ' + st.comune, M, y); y += 16;
+      doc.text('Centralina: ' + st.name + ' — ' + st.comune, M, y); y += 16;
       const days0 = periodDays(state.day, state.per);
       const perLabel = state.per === 'week' ? 'Settimana' : state.per === 'month' ? 'Mese' : 'Anno';
       doc.text(perLabel + ': ' + fmtLong(days0[0]) + ' – ' + fmtLong(days0[days0.length - 1]), M, y); y += 16;
