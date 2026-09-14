@@ -6,6 +6,8 @@
 | Confini comunali | `data/comuni_pv.geojson`, `data/provincia_pv.geojson` (semplificati) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | ISTAT, via [openpolis/geojson-italy](https://github.com/openpolis/geojson-italy) |
 | Leaflet 1.9.4 | `site/vendor/leaflet.js`, `leaflet.css` | BSD-2-Clause | https://leafletjs.com |
 | Chart.js 4.4 | `site/vendor/chart.umd.js` | MIT | https://www.chartjs.org |
+| jsPDF 4.2.1 | `site/vendor/jspdf.umd.min.js` (caricato solo all'uso del report PDF) | MIT | https://github.com/parallax/jsPDF |
+| jsPDF-AutoTable 5.0.8 | `site/vendor/jspdf.plugin.autotable.min.js` (idem) | MIT | https://github.com/simonbengtsson/jsPDF-AutoTable |
 | IBM Plex Sans / Mono | `site/fonts/` (sottoinsieme latin, via @fontsource) | [SIL OFL 1.1](site/fonts/LICENSE-OFL.txt) | IBM |
 | Tile di mappa (opzionali, caricate dal browser solo su richiesta) | — | [ODbL](https://www.openstreetmap.org/copyright) | © OpenStreetMap contributors |
 

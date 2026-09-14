@@ -27,6 +27,7 @@ seguire l'andamento di una stazione nel tempo.
 - per la data scelta, i valori di ogni stazione visibile, con i superamenti dei limiti di legge in rosso e quelli del riferimento
   OMS in ambra;
 - per una stazione alla volta, il grafico dell'inquinante scelto su settimana, mese o anno, con la soglia tracciata;
+- un report PDF per la stazione e il periodo scelti (uno o più inquinanti, grafico, tabella dei valori, conteggio dei superamenti), generato interamente nel browser;
 - una mappa vettoriale della provincia (confini comunali ISTAT); lo sfondo OpenStreetMap si può attivare a richiesta.
 
 ## Struttura del repository
@@ -37,7 +38,7 @@ seguire l'andamento di una stazione nel tempo.
 | `scripts/build_data.py` | costruisce `site/data.js`, il bundle compatto letto dalla pagina (generato dal workflow, non versionato) |
 | `data/` | aggregati giornalieri degli anni **chiusi** (fino a due anni fa) e confini comunali ISTAT semplificati |
 | `data/open/` | anno corrente, anno precedente e anagrafica sensori: riscaricati ogni notte, non versionati |
-| `site/` | la pagina (`index.html`, `style.css`, `app.js`), il logo, i font e le librerie vendorizzate (Leaflet 1.9.4, Chart.js 4.4) |
+| `site/` | la pagina (`index.html`, `style.css`, `app.js`), il logo, i font e le librerie vendorizzate (Leaflet 1.9.4, Chart.js 4.4, jsPDF 4.2.1 + AutoTable 5.0.8) |
 | `.github/workflows/update.yml` | cron notturno: fetch → build → commit dei dati → deploy su Pages |
 
 ## Messa in funzione
@@ -99,9 +100,8 @@ OpenStreetMap, che vengono richieste ai server OSM solo se il visitatore attiva 
 
 ## Prossimi passi
 
-- **Report PDF**: esportazione di un report per stazione e periodo (grafico, tabella dei valori, conteggio dei superamenti). Prima
-  con un foglio di stile di stampa, poi con un pulsante di esportazione nella pagina; in prospettiva, report mensili per tutte le
-  stazioni generati dal workflow notturno.
+- **Report PDF mensili**: generazione automatica, lato server, di un report per ogni stazione a fine mese, ad opera del workflow
+  notturno (oggi il report è generato a richiesta nel browser del visitatore, per stazione e periodo scelti).
 - Fiumi principali (Po, Ticino) sulla mappa vettoriale, per orientarsi senza attivare OpenStreetMap.
 - Confronto tra due stazioni sullo stesso grafico.
 
@@ -117,5 +117,5 @@ metriche normative e architettura sono state discusse in conversazione; il codic
 
 Codice e pagina: [MIT](LICENSE). Dati ARPA Lombardia via Regione Lombardia Open Data: licenza CC0 1.0 (pubblico dominio), attribuzione
 «ARPA LOMBARDIA» come indicato nei metadati dei dataset; rielaborati come descritto sopra. Confini ISTAT via [openpolis/geojson-italy](https://github.com/openpolis/geojson-italy): CC BY 4.0. Leaflet (BSD-2),
-Chart.js (MIT), IBM Plex (OFL 1.1). Tile di sfondo opzionali © OpenStreetMap contributors (ODbL). Dettagli in
+Chart.js (MIT), jsPDF e jsPDF-AutoTable (MIT), IBM Plex (OFL 1.1). Tile di sfondo opzionali © OpenStreetMap contributors (ODbL). Dettagli in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

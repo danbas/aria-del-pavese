@@ -292,6 +292,66 @@
     const days = []; for (let s = start; s <= end; s = addDays(s, 1)) days.push(s);
     return days;
   }
+  // dati della serie per una stazione+inquinante+periodo, indipendenti dal tema o dal rendering:
+  // usati sia dal grafico a schermo sia dal report PDF, per non duplicare (e disallineare) il calcolo.
+  function buildSeries(st, pcode, per, day) {
+    const p = POLL[pcode];
+    const sids = st.sensors.filter((sid) => SENS[sid].p === pcode);
+    const unit = SENS[sids[0]].unit;
+    const days = periodDays(day, per);
+    const vals = days.map((d) => { for (const sid of sids) { const r = reading(sid, d); if (r && r.v != null) return r.v; } return null; });
+    const n = vals.filter((v) => v != null).length;
+    const over = vals.filter((v) => v != null && p.limit != null && v > p.limit).length;
+    const max = n ? Math.max(...vals.filter((v) => v != null)) : null;
+    const mean = n ? vals.filter((v) => v != null).reduce((a, b) => a + b, 0) / n : null;
+    return { p, pcode, sids, unit, days, vals, n, over, max, mean };
+  }
+  // config Chart.js per una serie; colors è un set di colori concreti (tema a schermo, o palette fissa per il PDF).
+  // opts.responsive=false è usato per il canvas offscreen del report: dimensioni fisse, niente ResizeObserver.
+  function buildChartConfig(series, day, per, colors, opts) {
+    opts = opts || {};
+    const { p, pcode, unit, days, vals, n } = series;
+    const overColor = p.kind === 'oms' ? colors.warn : colors.crit;
+    const isYear = per === 'year';
+    const selIdx = days.indexOf(day);
+    const pointColors = vals.map((v, i) => (v != null && p.limit != null && v > p.limit) ? overColor : (i === selIdx ? colors.ink : colors.accent));
+    const pointRadius = vals.map((v, i) => i === selIdx ? 5 : (v != null && p.limit != null && v > p.limit) ? (isYear ? 2.5 : 4) : (isYear ? 0 : 3));
+    const datasets = [{
+      label: p.label + ' (' + metricLabel(pcode) + ')', data: vals, borderColor: colors.accent, backgroundColor: colors.accent, borderWidth: 2, tension: 0.15, spanGaps: false,
+      pointRadius, pointHoverRadius: 6, pointBackgroundColor: pointColors, pointBorderColor: pointColors, fill: false,
+    }];
+    if (p.limit != null) datasets.push({ label: (p.kind === 'legge' ? 'Limite di legge' : 'Riferimento OMS') + ' ' + p.limit, data: days.map(() => p.limit), borderColor: overColor, borderDash: [6, 4], borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 0, fill: false });
+    const labels = days.map((d) => isYear ? d : fmtShort(d));
+    const cfg = {
+      type: 'line', data: { labels, datasets },
+      options: {
+        responsive: opts.responsive !== false, maintainAspectRatio: false, animation: false, devicePixelRatio: opts.responsive === false ? 1 : undefined, interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: true, position: 'bottom', labels: { color: colors.ink2, boxWidth: 18, boxHeight: 2, usePointStyle: false, font: { family: '"IBM Plex Sans", system-ui, sans-serif', size: 12 } } },
+          tooltip: {
+            backgroundColor: colors.surface, titleColor: colors.ink, bodyColor: colors.ink2, borderColor: colors.lineStrong, borderWidth: 1, padding: 8,
+            titleFont: { family: '"IBM Plex Sans", system-ui, sans-serif', weight: '600' }, bodyFont: { family: '"IBM Plex Mono", monospace' },
+            callbacks: {
+              title: (items) => fmtLong(days[items[0].dataIndex]),
+              label: (it) => it.datasetIndex === 0 ? (it.raw == null ? 'nessun dato' : ` ${fmtV(it.raw, pcode)} ${unit}` + (p.limit != null && it.raw > p.limit ? '  ▲ oltre ' + p.limit : '')) : null,
+            },
+            filter: (it) => it.datasetIndex === 0,
+          },
+        },
+        scales: {
+          x: { grid: { display: false }, border: { color: colors.lineStrong }, ticks: { color: colors.muted, maxRotation: 0, autoSkip: true, maxTicksLimit: isYear ? 12 : per === 'month' ? 16 : 7, font: { family: '"IBM Plex Mono", monospace', size: 11 },
+            callback: (v, i) => isYear ? (days[i].endsWith('-01') ? MONTHS[+days[i].slice(5, 7) - 1].slice(0, 3) : null) : labels[i] } },
+          y: { beginAtZero: true, grid: { color: colors.grid }, border: { display: false }, ticks: { color: colors.muted, font: { family: '"IBM Plex Mono", monospace', size: 11 } }, title: { display: true, text: unit, color: colors.muted, font: { size: 11 } } },
+        },
+        onClick: (e, els) => { if (els.length) { const d = days[els[0].index]; if (d >= MIN_DAY && d <= MAX_DAY) setDay(d); } },
+      },
+    };
+    if (isYear) cfg.options.scales.x.ticks.autoSkip = false;
+    return cfg;
+  }
+  function themeColors() {
+    return { accent: css('--accent'), crit: css('--crit'), warn: css('--warn'), muted: css('--muted'), grid: css('--line'), lineStrong: css('--line-strong'), ink: css('--ink'), ink2: css('--ink-2'), surface: css('--surface') };
+  }
   function syncChart() {
     const tabs = $('#poltabs'); tabs.innerHTML = '';
     // il grafico segue le centraline visibili: se quella selezionata è nascosta passa alla prima visibile
@@ -312,17 +372,10 @@
       b.addEventListener('click', () => { state.pol = p; render(); }); tabs.append(b);
     }
     perButtons.forEach((b) => b.setAttribute('aria-pressed', b.dataset.per === state.per));
-    const p = POLL[state.pol];
-    const sids = st.sensors.filter((sid) => SENS[sid].p === state.pol);
-    const unit = SENS[sids[0]].unit;
-    const days = periodDays(state.day, state.per);
+    const series = buildSeries(st, state.pol, state.per, state.day);
+    const { p, unit, days, n, over, max, mean } = series;
     $('#h-chart').textContent = 'Andamento — ' + st.name;
     $('#chart-range').textContent = fmtShort(days[0]) + ' – ' + fmtShort(days[days.length - 1]) + ' ' + days[0].slice(0, 4);
-    const vals = days.map((day) => { for (const sid of sids) { const r = reading(sid, day); if (r && r.v != null) return r.v; } return null; });
-    const n = vals.filter((v) => v != null).length;
-    const over = vals.filter((v) => v != null && p.limit != null && v > p.limit).length;
-    const max = n ? Math.max(...vals.filter((v) => v != null)) : null;
-    const mean = n ? vals.filter((v) => v != null).reduce((a, b) => a + b, 0) / n : null;
     $('#stats').innerHTML =
       `<span>Giorni con dati <b>${n}/${days.length}</b></span>` +
       `<span>Media del periodo <b>${mean == null ? '—' : fmtV(mean, state.pol)}</b> ${unit}</span>` +
@@ -331,49 +384,160 @@
     const empty = $('#chart-empty'), box = $('.chartbox');
     if (!n) { empty.hidden = false; empty.textContent = 'Nessun dato per ' + p.label + ' a ' + st.name + ' in questo periodo.'; box.hidden = true; if (chart) { chart.destroy(); chart = null; } return; }
     empty.hidden = true; box.hidden = false;
-    const accent = css('--accent'), crit = css('--crit'), warn = css('--warn'), muted = css('--muted'), grid = css('--line'), ink2 = css('--ink-2');
-    const overColor = p.kind === 'oms' ? warn : crit;
-    const isYear = state.per === 'year';
-    const selIdx = days.indexOf(state.day);
-    const pointColors = vals.map((v, i) => (v != null && p.limit != null && v > p.limit) ? overColor : (i === selIdx ? css('--ink') : accent));
-    const pointRadius = vals.map((v, i) => i === selIdx ? 5 : (v != null && p.limit != null && v > p.limit) ? (isYear ? 2.5 : 4) : (isYear ? 0 : 3));
-    const datasets = [{
-      label: p.label + ' (' + metricLabel(state.pol) + ')', data: vals, borderColor: accent, backgroundColor: accent, borderWidth: 2, tension: 0.15, spanGaps: false,
-      pointRadius, pointHoverRadius: 6, pointBackgroundColor: pointColors, pointBorderColor: pointColors, fill: false,
-    }];
-    if (p.limit != null) datasets.push({ label: (p.kind === 'legge' ? 'Limite di legge' : 'Riferimento OMS') + ' ' + p.limit, data: days.map(() => p.limit), borderColor: overColor, borderDash: [6, 4], borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 0, fill: false });
-    const labels = days.map((d) => isYear ? d : fmtShort(d));
-    const cfg = {
-      type: 'line', data: { labels, datasets },
-      options: {
-        responsive: true, maintainAspectRatio: false, animation: false, interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: { display: true, position: 'bottom', labels: { color: ink2, boxWidth: 18, boxHeight: 2, usePointStyle: false, font: { family: '"IBM Plex Sans", system-ui, sans-serif', size: 12 } } },
-          tooltip: {
-            backgroundColor: css('--surface'), titleColor: css('--ink'), bodyColor: css('--ink-2'), borderColor: css('--line-strong'), borderWidth: 1, padding: 8,
-            titleFont: { family: '"IBM Plex Sans", system-ui, sans-serif', weight: '600' }, bodyFont: { family: '"IBM Plex Mono", monospace' },
-            callbacks: {
-              title: (items) => fmtLong(days[items[0].dataIndex]),
-              label: (it) => it.datasetIndex === 0 ? (it.raw == null ? 'nessun dato' : ` ${fmtV(it.raw, state.pol)} ${unit}` + (p.limit != null && it.raw > p.limit ? '  ▲ oltre ' + p.limit : '')) : null,
-            },
-            filter: (it) => it.datasetIndex === 0,
-          },
-        },
-        scales: {
-          x: { grid: { display: false }, border: { color: css('--line-strong') }, ticks: { color: muted, maxRotation: 0, autoSkip: true, maxTicksLimit: isYear ? 12 : state.per === 'month' ? 16 : 7, font: { family: '"IBM Plex Mono", monospace', size: 11 },
-            callback: (v, i) => isYear ? (days[i].endsWith('-01') ? MONTHS[+days[i].slice(5, 7) - 1].slice(0, 3) : null) : labels[i] } },
-          y: { beginAtZero: true, grid: { color: grid }, border: { display: false }, ticks: { color: muted, font: { family: '"IBM Plex Mono", monospace', size: 11 } }, title: { display: true, text: unit, color: muted, font: { size: 11 } } },
-        },
-        onClick: (e, els) => { if (els.length) { const d = days[els[0].index]; if (d >= MIN_DAY && d <= MAX_DAY) setDay(d); } },
-      },
-    };
-    if (isYear) cfg.options.scales.x.ticks.autoSkip = false;
+    const cfg = buildChartConfig(series, state.day, state.per, themeColors());
     if (chart) { chart.config.data = cfg.data; chart.config.options = cfg.options; chart.update(); } else chart = new Chart($('#chart'), cfg);
   }
 
+  // ---------- report PDF ----------
+  // palette fissa (chiara), indipendente dal tema del visitatore: il PDF deve restare leggibile
+  // qualunque sia il tema a schermo, quindi non usa le variabili CSS ma valori concreti.
+  const LIGHT = { accent: '#1f6f8b', crit: '#c4372f', critSoft: '#f8e1de', critInk: '#8f2721', warn: '#b8770a', warnSoft: '#f8ecd2', warnInk: '#7d5006', muted: '#7a8189', grid: '#d9ddd6', lineStrong: '#b9bfb8', ink: '#161a1d', ink2: '#4b535c', surface: '#fbfbfa' };
+  const reportState = { station: null, pols: new Set() };
+  let pdfLibsPromise = null;
+  function loadPdfLibs() {
+    if (pdfLibsPromise) return pdfLibsPromise;
+    pdfLibsPromise = new Promise((resolve, reject) => {
+      const s1 = document.createElement('script'); s1.src = 'vendor/jspdf.umd.min.js';
+      s1.onerror = () => reject(new Error('jspdf'));
+      s1.onload = () => {
+        const s2 = document.createElement('script'); s2.src = 'vendor/jspdf.plugin.autotable.min.js';
+        s2.onerror = () => reject(new Error('autotable'));
+        s2.onload = resolve;
+        document.head.append(s2);
+      };
+      document.head.append(s1);
+    });
+    return pdfLibsPromise;
+  }
+  const repPolsBox = $('#rep-pols'), repGo = $('#rep-go'), repStatus = $('#rep-status');
+  function syncReportPanel() {
+    const st = stById[state.sel];
+    repPolsBox.innerHTML = '';
+    if (!st) { repGo.disabled = true; return; }
+    const pcodes = D.order.filter((p) => st.sensors.some((sid) => SENS[sid].p === p));
+    const sameStation = reportState.station === st.id;
+    for (const p of pcodes) {
+      const label = document.createElement('label'); label.className = 'rep-check';
+      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = p;
+      cb.checked = sameStation ? reportState.pols.has(p) : p === state.pol;
+      cb.addEventListener('change', () => { if (cb.checked) reportState.pols.add(p); else reportState.pols.delete(p); });
+      label.append(cb, document.createTextNode(' ' + POLL[p].label));
+      repPolsBox.append(label);
+    }
+    reportState.station = st.id;
+    reportState.pols = new Set(pcodes.filter((p) => sameStation ? reportState.pols.has(p) : p === state.pol));
+    repGo.disabled = false;
+  }
+  function nextFrame() { return new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))); }
+  async function renderChartImage(series, day, per) {
+    if (!series.n) return null;
+    const canvas = document.createElement('canvas');
+    canvas.width = 1500; canvas.height = 560;
+    canvas.style.width = '1500px'; canvas.style.height = '560px';
+    canvas.style.position = 'fixed'; canvas.style.left = '-9999px'; canvas.style.top = '0';
+    document.body.append(canvas);
+    const cfg = buildChartConfig(series, day, per, LIGHT, { responsive: false });
+    const ch = new Chart(canvas, cfg);
+    await nextFrame();
+    const img = ch.toBase64Image('image/png', 1);
+    ch.destroy(); canvas.remove();
+    return img;
+  }
+  const slugify = (s) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  // il font "helvetica" standard di jsPDF (non incorporato) non rende alcuni caratteri Unicode:
+  // µ e ³ restano invisibili, i pedici ₂ ₃ ₓ vengono sostituiti con glifi sbagliati. Si sostituiscono
+  // con equivalenti ASCII solo nel testo destinato al PDF (a schermo restano quelli tipografici corretti).
+  const pdfSafe = (s) => String(s).replace(/µ/g, 'u').replace(/³/g, '3').replace(/₂/g, '2').replace(/₃/g, '3').replace(/ₓ/g, 'x');
+  async function buildReportPdf() {
+    const st = stById[state.sel];
+    if (!st || !reportState.pols.size) { repStatus.textContent = 'Seleziona almeno un inquinante.'; return; }
+    const pcodes = D.order.filter((p) => st.sensors.some((sid) => SENS[sid].p === p)).filter((p) => reportState.pols.has(p));
+    const blocks = { chart: $('#rep-chart').checked, table: $('#rep-table').checked, count: $('#rep-count').checked, meta: $('#rep-meta').checked };
+    const prevLabel = repGo.textContent;
+    repGo.disabled = true; repGo.textContent = 'Generazione…'; repStatus.textContent = '';
+    try {
+      await loadPdfLibs();
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ unit: 'pt', format: 'a4', compress: true });
+      const pageW = doc.internal.pageSize.getWidth();
+      const M = 40; let y = M;
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor(LIGHT.ink);
+      doc.text('Aria del Pavese', M, y); y += 20;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor(LIGHT.ink2);
+      doc.text(st.name + ' — ' + st.comune, M, y); y += 16;
+      const days0 = periodDays(state.day, state.per);
+      const perLabel = state.per === 'week' ? 'Settimana' : state.per === 'month' ? 'Mese' : 'Anno';
+      doc.text(perLabel + ': ' + fmtLong(days0[0]) + ' – ' + fmtLong(days0[days0.length - 1]), M, y); y += 16;
+      doc.setFontSize(9); doc.setTextColor(LIGHT.muted);
+      doc.text('Generato il ' + new Date().toISOString().slice(0, 10) + ' · dati ARPA scaricati il ' + D.generated.slice(0, 10), M, y); y += 14;
+      if (blocks.meta) {
+        const note = 'Fonte: ARPA Lombardia, open data su dati.lombardia.it, licenza CC0 1.0 (pubblico dominio), attribuzione «ARPA LOMBARDIA». Sono usati solo i valori con stato «validato» (VA). I limiti sono quelli del D.Lgs. 155/2010; per il PM2.5, che ha solo un limite annuale, la soglia giornaliera mostrata è la linea guida OMS 2021 (15 µg/m³) e non un limite di legge. Le aggregazioni giornaliere e i conteggi dei superamenti sono elaborazioni proprie di questo progetto indipendente, non affiliato ad ARPA Lombardia; per usi ufficiali fare riferimento ad ARPA. Sito: danbas.github.io/aria-del-pavese/';
+        const lines = doc.splitTextToSize(pdfSafe(note), pageW - 2 * M);
+        doc.setFontSize(8.5); doc.text(lines, M, y); y += lines.length * 10 + 6;
+      }
+      doc.setDrawColor(LIGHT.grid); doc.line(M, y, pageW - M, y); y += 18;
+
+      for (let i = 0; i < pcodes.length; i++) {
+        if (i > 0) { doc.addPage(); y = M; }
+        const series = buildSeries(st, pcodes[i], state.per, state.day);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(LIGHT.ink);
+        doc.text(pdfSafe(series.p.label) + ' (' + metricLabel(pcodes[i]) + ')', M, y); y += 18;
+        if (!series.n) {
+          doc.setFont('helvetica', 'italic'); doc.setFontSize(10); doc.setTextColor(LIGHT.muted);
+          doc.text('Nessun dato disponibile per questo inquinante nel periodo selezionato.', M, y); y += 20;
+          continue;
+        }
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(LIGHT.ink2);
+        const unit = pdfSafe(series.unit);
+        const parts = [
+          'Giorni con dati: ' + series.n + '/' + series.days.length,
+          'Media: ' + (series.mean == null ? '—' : fmtV(series.mean, pcodes[i])) + ' ' + unit,
+          'Massimo: ' + (series.max == null ? '—' : fmtV(series.max, pcodes[i])) + ' ' + unit,
+        ];
+        if (blocks.count && series.p.limit != null) parts.push('Giorni oltre ' + (series.p.kind === 'legge' ? 'il limite' : 'il riferimento OMS') + ' (' + series.p.limit + '): ' + series.over);
+        doc.text(parts.join('   ·   '), M, y); y += 16;
+        if (blocks.chart) {
+          const img = await renderChartImage(series, state.day, state.per);
+          if (img) { doc.addImage(img, 'PNG', M, y, pageW - 2 * M, 150); y += 164; }
+        }
+        if (blocks.table) {
+          const rows = series.days.map((d, idx) => {
+            const v = series.vals[idx];
+            const lv = (v != null && series.p.limit != null && v > series.p.limit) ? (series.p.kind === 'legge' ? 'law' : 'who') : null;
+            return { cells: [fmtLong(d), v == null ? '—' : fmtV(v, pcodes[i]) + ' ' + unit, lv === 'law' ? 'Oltre il limite di legge' : lv === 'who' ? 'Oltre il riferimento OMS' : ''], lv };
+          });
+          doc.autoTable({
+            startY: y, margin: { left: M, right: M },
+            head: [['Data', 'Valore', 'Esito']],
+            body: rows.map((r) => r.cells),
+            styles: { font: 'helvetica', fontSize: 8.5, cellPadding: 3, textColor: LIGHT.ink2 },
+            headStyles: { fillColor: LIGHT.ink, textColor: '#ffffff', fontStyle: 'bold' },
+            didParseCell: (data) => {
+              if (data.section !== 'body') return;
+              const lv = rows[data.row.index].lv;
+              if (lv === 'law') { data.cell.styles.fillColor = LIGHT.critSoft; data.cell.styles.textColor = LIGHT.critInk; data.cell.styles.fontStyle = 'bold'; }
+              else if (lv === 'who') { data.cell.styles.fillColor = LIGHT.warnSoft; data.cell.styles.textColor = LIGHT.warnInk; data.cell.styles.fontStyle = 'bold'; }
+            },
+          });
+          y = doc.lastAutoTable.finalY + 16;
+        }
+      }
+
+      const fname = 'aria-pavese_' + slugify(st.name) + '_' + state.per + '_' + state.day + '.pdf';
+      doc.save(fname);
+      repStatus.textContent = 'PDF generato: ' + fname;
+    } catch (e) {
+      console.error(e);
+      repStatus.textContent = 'Errore nella generazione del PDF. Riprova.';
+    } finally {
+      repGo.disabled = false; repGo.textContent = prevLabel;
+    }
+  }
+  repGo.addEventListener('click', buildReportPdf);
+
   // ---------- render ----------
   function render() {
-    syncDateControls(); syncToday(); syncList(); syncMap(); syncTable(); syncChart(); persist();
+    syncDateControls(); syncToday(); syncList(); syncMap(); syncTable(); syncChart(); syncReportPanel(); persist();
   }
   $('#gen').textContent = 'Dati scaricati il ' + D.generated.replace('T', ' alle ').replace('Z', ' UTC') + '.';
   buildList();

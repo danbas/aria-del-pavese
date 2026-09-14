@@ -165,6 +165,17 @@ table.vals td:first-child .cm{color:var(--muted);font-size:11px;font-weight:400;
 @media (max-width:600px){ .chartbox{height:240px} }
 .empty{color:var(--muted);padding:24px;text-align:center}
 
+/* report PDF */
+.rep-group{margin-bottom:12px}
+.rep-label{font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:6px}
+.rep-pols{display:flex;flex-wrap:wrap;gap:4px 16px}
+.rep-check{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:6px;min-width:0}
+.rep-check input{accent-color:var(--accent);flex:none}
+.btn-primary{background:var(--accent);color:#fff;border-radius:6px;padding:8px 16px;font-weight:500;font-size:13px}
+.btn-primary:hover{background:var(--accent-ink)}
+.btn-primary:disabled{opacity:.55;cursor:default}
+#rep-status{min-height:16px}
+
 /* footer */
 footer{margin-top:22px;padding-top:14px;border-top:1px solid var(--line);font-size:12px;color:var(--muted);display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,42ch),1fr));gap:8px 32px}
 footer p{max-width:none}
