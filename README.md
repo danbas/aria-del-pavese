@@ -74,7 +74,7 @@ Un valore per sensore e per giorno solare (data del timestamp ARPA), usando solo
 - **massimo orario** per NO₂ (e SO₂, per il limite orario di 350 µg/m³);
 - **massimo giornaliero della media mobile su 8 ore** per O₃ e CO (finestra valida con almeno 6 ore su 8).
 
-I giorni con meno di 18 ore valide sono segnati come parziali. Le soglie sono quelle del D.Lgs. 155/2010 (direttiva 2008/50/CE).
+I giorni con meno di 18 ore valide sono segnati come parziali. Lo stato «validato» (`VA`) è un controllo qualità automatico per singola lettura, non un attestato di dato definitivo: i dati dell'anno in corso (e, fino al 30 marzo, quelli dell'anno precedente) restano provvisori e ARPA può ancora rivederli retroattivamente. Le soglie sono quelle del D.Lgs. 155/2010 (direttiva 2008/50/CE).
 Il PM2.5 ha solo un limite annuale (25 µg/m³): come soglia giornaliera viene usata la linea guida OMS 2021 (15 µg/m³), etichettata
 come riferimento OMS e non come limite di legge. La direttiva (UE) 2024/2881 introdurrà dal 2030 limiti più severi.
 
