@@ -19,6 +19,7 @@
   const dayIndex = (s) => { const d = toDate(s); return { y: d.getUTCFullYear(), i: Math.round((d - Date.UTC(d.getUTCFullYear(), 0, 1)) / 864e5) }; };
   const fmtLong = (s) => { const d = toDate(s); return DOWS[d.getUTCDay()] + ' ' + d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()] + ' ' + d.getUTCFullYear(); };
   const fmtDMY = (s) => { const [y, m, d] = s.split('-'); return d + '/' + m + '/' + y; };
+  const fmtDowDMY = (s) => DOWS[toDate(s).getUTCDay()] + ' ' + fmtDMY(s);
   const fmtShort = (s) => { const d = toDate(s); return d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()].slice(0, 3); };
 
   // ---------- data access ----------
@@ -514,6 +515,31 @@
     });
     return logoPngPromise;
   }
+  // Le icone meteo nel PDF seguono la stessa strada del logo: jsPDF non disegna SVG, quindi i sette simboli
+  // vengono rasterizzati una volta sola in canvas e riusati come PNG in tutte le celle. Due accortezze:
+  // serve l'attributo xmlns (dentro l'HTML è implicito, in un data URI no) e serve un colore esplicito al
+  // posto di currentColor, che fuori dal DOM non ha alcun valore. La dimensione di 72 px è ~7 volte quella
+  // di resa (10 pt): in stampa restano nitide.
+  const RAIN_PDF = { 1: '#b9d5e3', 2: '#86b6cd', 3: '#4e93b1', 4: '#1f6f8b' };
+  let meteoPngsPromise = null;
+  function loadMeteoPngs() {
+    if (meteoPngsPromise) return meteoPngsPromise;
+    const SIZE = 72;
+    meteoPngsPromise = Promise.all(Object.keys(METEO_ICON).map((k) => new Promise((resolve) => {
+      const svg = METEO_ICON[k]
+        .replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" ')
+        .replace(/currentColor/g, LIGHT.ink2);
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement('canvas'); c.width = c.height = SIZE;
+        c.getContext('2d').drawImage(img, 0, 0, SIZE, SIZE);
+        resolve([k, c.toDataURL('image/png')]);
+      };
+      img.onerror = () => resolve([k, null]);
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    }))).then((pairs) => Object.fromEntries(pairs.filter((p) => p[1])));
+    return meteoPngsPromise;
+  }
   const repPolsBox = $('#rep-pols'), repGo = $('#rep-go'), repStatus = $('#rep-status');
   function syncReportPanel() {
     const st = stById[state.sel];
@@ -553,11 +579,13 @@
   // µ e ³ restano invisibili, i pedici ₂ ₃ ₓ vengono sostituiti con glifi sbagliati. Si sostituiscono
   // con equivalenti ASCII solo nel testo destinato al PDF (a schermo restano quelli tipografici corretti).
   const pdfSafe = (s) => String(s).replace(/µ/g, 'u').replace(/³/g, '3').replace(/₂/g, '2').replace(/₃/g, '3').replace(/ₓ/g, 'x');
-  function meteoPdfText(stId, day) {
+  // riga meteo per il PDF: testo (resta cercabile e non richiede legenda), gruppo per l'icona,
+  // livello di pioggia per la barretta sul bordo inferiore della cella
+  function meteoPdfRow(stId, day) {
     const m = meteoDay(stId, day);
-    if (!m) return '—';
+    if (!m) return { text: '—', group: null, rl: 0 };
     const label = m.wc != null ? (WMO_LABEL[m.wc] || 'n/d') : 'n/d';
-    return pdfSafe(label) + '  ' + fmtT(m.tmax) + '/' + fmtT(m.tmin);
+    return { text: pdfSafe(label) + '  ' + fmtT(m.tmax) + '/' + fmtT(m.tmin), group: wmoGroup(m.wc), rl: rainLevel(m.pr) };
   }
   async function buildReportPdf() {
     const st = stById[state.sel];
@@ -567,7 +595,7 @@
     const prevLabel = repGo.textContent;
     repGo.disabled = true; repGo.textContent = 'Generazione…'; repStatus.textContent = '';
     try {
-      const [, logoPng] = await Promise.all([loadPdfLibs(), loadLogoPng()]);
+      const [, logoPng, meteoPngs] = await Promise.all([loadPdfLibs(), loadLogoPng(), loadMeteoPngs()]);
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF({ unit: 'pt', format: 'a4', compress: true });
       const pageW = doc.internal.pageSize.getWidth();
@@ -604,7 +632,7 @@
       doc.setTextColor(LIGHT.accent);
       doc.textWithLink(SITE_URL.replace(/^https:\/\//, ''), M, y, { url: SITE_URL }); y += 16;
       if (blocks.meta) {
-        const note = 'Fonte: ARPA Lombardia, dati delle centraline di monitoraggio della qualità dell\'aria, open data su dati.lombardia.it, licenza CC0 1.0 (pubblico dominio), attribuzione «ARPA LOMBARDIA». Sono usati solo i valori con stato «validato» (VA); questo indica una lettura passata al controllo qualità automatico di ARPA, non che il dato sia definitivo: i dati dell\'anno in corso (e, fino al 30 marzo, quelli dell\'anno precedente) restano provvisori e ARPA può ancora rivederli retroattivamente. I limiti sono quelli del D.Lgs. 155/2010; per il PM2.5, che ha solo un limite annuale, la soglia giornaliera mostrata è la linea guida OMS 2021 (15 µg/m³) e non un limite di legge. Le informazioni meteo (colonna «Meteo») provengono da Open-Meteo (open-meteo.com), rianalisi ERA5/ERA5-Land di ECMWF, licenza CC BY 4.0: è il dato del punto griglia più vicino alla centralina (risoluzione ~9-25 km), non una misura fatta sul posto. Le aggregazioni giornaliere e i conteggi dei superamenti sono elaborazioni proprie di questo progetto indipendente, non affiliato ad ARPA Lombardia né a Open-Meteo; per usi ufficiali fare riferimento alle fonti primarie.';
+        const note = 'Fonte: ARPA Lombardia, dati delle centraline di monitoraggio della qualità dell\'aria, open data su dati.lombardia.it, licenza CC0 1.0 (pubblico dominio), attribuzione «ARPA LOMBARDIA». Sono usati solo i valori con stato «validato» (VA); questo indica una lettura passata al controllo qualità automatico di ARPA, non che il dato sia definitivo: i dati dell\'anno in corso (e, fino al 30 marzo, quelli dell\'anno precedente) restano provvisori e ARPA può ancora rivederli retroattivamente. I limiti sono quelli del D.Lgs. 155/2010; per il PM2.5, che ha solo un limite annuale, la soglia giornaliera mostrata è la linea guida OMS 2021 (15 µg/m³) e non un limite di legge. Le informazioni meteo (colonna «Meteo») provengono da Open-Meteo (open-meteo.com), rianalisi ERA5/ERA5-Land di ECMWF, licenza CC BY 4.0: è il dato del punto griglia più vicino alla centralina (risoluzione ~9-25 km), non una misura fatta sul posto; la barretta sotto l\'icona indica le precipitazioni del giorno, dalle tracce (tenue) alla pioggia forte (piena). Le aggregazioni giornaliere e i conteggi dei superamenti sono elaborazioni proprie di questo progetto indipendente, non affiliato ad ARPA Lombardia né a Open-Meteo; per usi ufficiali fare riferimento alle fonti primarie.';
         doc.setTextColor(LIGHT.muted);
         const lines = doc.splitTextToSize(pdfSafe(note), pageW - 2 * M);
         doc.setFontSize(8.5); doc.text(lines, M, y); y += lines.length * 10 + 6;
@@ -635,10 +663,11 @@
           if (img) { doc.addImage(img, 'PNG', M, y, pageW - 2 * M, 150); y += 164; }
         }
         if (blocks.table) {
+          const meteoRows = series.days.map((d) => meteoPdfRow(st.id, d));
           const rows = series.days.map((d, idx) => {
             const v = series.vals[idx];
             const lv = (v != null && series.p.limit != null && v > series.p.limit) ? (series.p.kind === 'legge' ? 'law' : 'who') : null;
-            return { cells: [fmtLong(d), meteoPdfText(st.id, d), v == null ? '—' : fmtV(v, pcodes[i]) + ' ' + unit, lv === 'law' ? 'Oltre il limite di legge' : lv === 'who' ? 'Oltre il riferimento OMS' : ''], lv };
+            return { cells: [fmtDowDMY(d), meteoRows[idx].text, v == null ? '—' : fmtV(v, pcodes[i]) + ' ' + unit, lv === 'law' ? 'Oltre il limite di legge' : lv === 'who' ? 'Oltre il riferimento OMS' : ''], lv };
           });
           doc.autoTable({
             startY: y, margin: { left: M, right: M },
@@ -646,11 +675,27 @@
             body: rows.map((r) => r.cells),
             styles: { font: 'helvetica', fontSize: 8.5, cellPadding: 3, textColor: LIGHT.ink2 },
             headStyles: { fillColor: LIGHT.ink, textColor: '#ffffff', fontStyle: 'bold' },
+            // spazio a sinistra nella colonna Meteo: lo occupa l'icona, disegnata in didDrawCell
+            columnStyles: { 1: { cellPadding: { top: 3, right: 3, bottom: 3, left: 17 } } },
             didParseCell: (data) => {
               if (data.section !== 'body') return;
               const lv = rows[data.row.index].lv;
               if (lv === 'law') { data.cell.styles.fillColor = LIGHT.critSoft; data.cell.styles.textColor = LIGHT.critInk; data.cell.styles.fontStyle = 'bold'; }
               else if (lv === 'who') { data.cell.styles.fillColor = LIGHT.warnSoft; data.cell.styles.textColor = LIGHT.warnInk; data.cell.styles.fontStyle = 'bold'; }
+            },
+            // icona e barra pioggia vengono disegnate sopra la cella, non come sfondo: così restano leggibili
+            // anche sulle righe già colorate di rosso o ambra per i superamenti
+            didDrawCell: (data) => {
+              if (data.section !== 'body' || data.column.index !== 1) return;
+              const mr = meteoRows[data.row.index];
+              if (!mr) return;
+              if (mr.group && meteoPngs[mr.group]) doc.addImage(meteoPngs[mr.group], 'PNG', data.cell.x + 3, data.cell.y + (data.cell.height - 10) / 2, 10, 10);
+              // barra larga quanto l'icona, non quanto la cella: a tutta larghezza si confonderebbe
+              // con un filetto della tabella, e perderebbe la somiglianza con la striscia a schermo
+              if (mr.rl) {
+                doc.setFillColor(RAIN_PDF[mr.rl]);
+                doc.rect(data.cell.x + 3, data.cell.y + (data.cell.height + 10) / 2 + 0.8, 10, 1.6, 'F');
+              }
             },
           });
           y = doc.lastAutoTable.finalY + 16;
