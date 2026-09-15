@@ -292,6 +292,9 @@
       (m.wg != null ? ` (raffiche ${Math.round(m.wg)} km/h)` : '') +
       ' · dato Open-Meteo (rianalisi ERA5/ERA5-Land, non una misura in loco)';
   }
+  // quattro passi di intensità per la barra delle precipitazioni (mm/giorno): sotto 0,05 mm il giorno
+  // è asciutto e la barra non compare, così la striscia resta silenziosa quando non c'è nulla da dire.
+  const rainLevel = (mm) => mm == null || mm < 0.05 ? 0 : mm < 1 ? 1 : mm < 5 ? 2 : mm < 15 ? 3 : 4;
   function meteoCellHtml(stId, day) {
     const m = meteoDay(stId, day);
     if (!m) return '<td class="meteo na">·</td>';
@@ -446,7 +449,7 @@
       `<span>Massimo <b>${max == null ? '—' : fmtV(max, state.pol)}</b> ${unit}</span>` +
       (p.limit != null ? `<span>Giorni oltre ${p.kind === 'legge' ? 'il limite' : 'il riferimento OMS'} (${p.limit}) <b class="${over ? 'crit' : ''}">${over}</b></span>` : '<span>Nessuna soglia giornaliera</span>');
     const empty = $('#chart-empty'), box = $('.chartbox'), mstrip = $('#meteo-strip');
-    if (!n) { empty.hidden = false; empty.textContent = 'Nessun dato per ' + p.label + ' a ' + st.name + ' in questo periodo.'; box.hidden = true; mstrip.hidden = true; if (chart) { chart.destroy(); chart = null; } return; }
+    if (!n) { empty.hidden = false; empty.textContent = 'Nessun dato per ' + p.label + ' a ' + st.name + ' in questo periodo.'; box.hidden = true; mstrip.hidden = true; $('#meteo-hint').hidden = true; if (chart) { chart.destroy(); chart = null; } return; }
     empty.hidden = true; box.hidden = false;
     const cfg = buildChartConfig(series, state.day, state.per, themeColors());
     if (chart) { chart.config.data = cfg.data; chart.config.options = cfg.options; chart.update(); } else chart = new Chart($('#chart'), cfg);
@@ -455,14 +458,16 @@
   // striscia di icone meteo sotto il grafico, allineata ai giorni del periodo: mostrata solo per
   // settimana/mese (per l'anno sarebbero ~365 icone, troppo dense per essere leggibili)
   function syncMeteoStrip(mstrip, st, days, per) {
-    if (per === 'year' || !D.meteo || !D.meteo[st.id]) { mstrip.hidden = true; mstrip.innerHTML = ''; return; }
-    mstrip.hidden = false;
+    const hint = $('#meteo-hint');
+    if (per === 'year' || !D.meteo || !D.meteo[st.id]) { mstrip.hidden = true; hint.hidden = true; mstrip.innerHTML = ''; return; }
+    mstrip.hidden = false; hint.hidden = false;
     mstrip.innerHTML = days.map((d) => {
       const m = meteoDay(st.id, d);
       if (!m) return `<div class="mday na" title="Meteo non disponibile"><svg viewBox="0 0 24 24" width="16" height="16"></svg></div>`;
       const group = wmoGroup(m.wc);
       const icon = group ? METEO_ICON[group] : '<svg viewBox="0 0 24 24" width="16" height="16"></svg>';
-      return `<div class="mday" title="${fmtShort(d)} — ${meteoTitle(m)}">${icon}</div>`;
+      const rl = rainLevel(m.pr);
+      return `<div class="mday${rl ? ' rl' + rl : ''}" title="${fmtShort(d)} — ${meteoTitle(m)}">${icon}</div>`;
     }).join('');
     mstrip.querySelectorAll('.mday').forEach((el, i) => el.addEventListener('click', () => { const d = days[i]; if (d >= MIN_DAY && d <= MAX_DAY) setDay(d); }));
   }

@@ -10,6 +10,8 @@ img{max-width:100%}
   --crit:#c4372f; --crit-soft:#f8e1de; --crit-ink:#8f2721;
   --warn:#b8770a; --warn-soft:#f8ecd2; --warn-ink:#7d5006;
   --ok:#2f7f5a;
+  /* scala precipitazioni della striscia meteo: su fondo chiaro più pioggia = più scuro */
+  --rain-1:#b9d5e3; --rain-2:#86b6cd; --rain-3:#4e93b1; --rain-4:#1f6f8b;
   --map-bg:#e6eae4; --map-fill:#eef1ec; --map-line:#c9cfc6; --map-prov:#5e6873; --map-label:#5a626b;
   --focus:#1f6f8b;
   --shadow: 0 1px 2px rgba(22,26,29,.06), 0 8px 24px -12px rgba(22,26,29,.18);
@@ -23,6 +25,8 @@ img{max-width:100%}
     --crit:#e2695f; --crit-soft:#4a2320; --crit-ink:#f2a49c;
     --warn:#e0a03a; --warn-soft:#46351a; --warn-ink:#f0c980;
     --ok:#5cb98a;
+  /* su fondo scuro la scala si inverte: più pioggia = più luminoso */
+  --rain-1:#2f5d70; --rain-2:#3d8fb0; --rain-3:#57b4d4; --rain-4:#8ad7f0;
     --map-bg:#171b1e; --map-fill:#20262a; --map-line:#353c42; --map-prov:#98a2ad; --map-label:#aab2bb;
     --focus:#8ac6da;
     --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
@@ -36,6 +40,8 @@ img{max-width:100%}
   --crit:#e2695f; --crit-soft:#4a2320; --crit-ink:#f2a49c;
   --warn:#e0a03a; --warn-soft:#46351a; --warn-ink:#f0c980;
   --ok:#5cb98a;
+  /* su fondo scuro la scala si inverte: più pioggia = più luminoso */
+  --rain-1:#2f5d70; --rain-2:#3d8fb0; --rain-3:#57b4d4; --rain-4:#8ad7f0;
   --map-bg:#171b1e; --map-fill:#20262a; --map-line:#353c42; --map-prov:#98a2ad; --map-label:#aab2bb;
   --focus:#8ac6da;
   --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
@@ -149,7 +155,9 @@ table.vals tr.sel td{background:var(--accent-soft)}
 table.vals tr.sel td:first-child{font-weight:600}
 table.vals td:first-child .cm{color:var(--muted);font-size:11px;font-weight:400;margin-left:6px}
 table.vals td.meteo{color:var(--ink-2);text-align:left}
-table.vals td.meteo svg{vertical-align:middle;margin-right:5px;color:var(--muted)}
+/* l'icona meteo regge il confronto con i valori accanto solo con abbastanza contrasto e peso:
+   a --muted e 16px spariva, soprattutto sul tema scuro */
+table.vals td.meteo svg{vertical-align:middle;margin-right:5px;color:var(--ink);width:18px;height:18px;stroke-width:1.9}
 table.vals td.meteo .mt{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;font-size:12px}
 table.vals td.meteo.na{color:var(--line-strong);text-align:center}
 .thresholds{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:4px 18px;font-size:12px;color:var(--ink-2);margin-top:10px}
@@ -171,8 +179,16 @@ table.vals td.meteo.na{color:var(--line-strong);text-align:center}
 .meteo-strip{display:flex;gap:1px;margin:4px 2px 0;overflow-x:auto}
 .meteo-strip .mday{flex:1 0 0;min-width:16px;display:flex;justify-content:center;align-items:center;color:var(--muted);cursor:pointer;border-radius:4px;padding:3px 0}
 .meteo-strip .mday:hover{background:var(--surface-2)}
-.meteo-strip .mday svg{color:var(--ink-2);flex:none}
+.meteo-strip .mday svg{color:var(--ink);flex:none;width:18px;height:18px;stroke-width:1.9}
 .meteo-strip .mday.na svg{visibility:hidden}
+/* barra sotto l'icona = precipitazioni del giorno, in quattro passi (asciutto: nessuna barra).
+   È un dato in più, non decorazione: la pioggia è ciò che spiega i crolli di PM nel grafico sopra.
+   Scala fredda di proposito: rosso e ambra restano riservati ai superamenti dei limiti. */
+.meteo-strip .mday.rl1{box-shadow:inset 0 -3px 0 var(--rain-1)}
+.meteo-strip .mday.rl2{box-shadow:inset 0 -3px 0 var(--rain-2)}
+.meteo-strip .mday.rl3{box-shadow:inset 0 -3px 0 var(--rain-3)}
+.meteo-strip .mday.rl4{box-shadow:inset 0 -3px 0 var(--rain-4)}
+.meteo-hint{font-size:11px;color:var(--muted);margin:3px 2px 0}
 
 /* report PDF */
 .rep-group{margin-bottom:12px}
