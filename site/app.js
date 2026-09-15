@@ -394,8 +394,11 @@
       type: 'line', data: { labels, datasets },
       options: {
         responsive: opts.responsive !== false, maintainAspectRatio: false, animation: false, devicePixelRatio: opts.responsive === false ? 1 : undefined, interaction: { mode: 'index', intersect: false },
+        layout: { padding: { bottom: opts.padBottom || 0 } },
         plugins: {
-          legend: { display: true, position: 'bottom', labels: { color: colors.ink2, boxWidth: 18, boxHeight: 2, usePointStyle: false, font: { family: '"IBM Plex Sans", system-ui, sans-serif', size: 12 } } },
+          // con la striscia meteo la legenda va in alto: in fondo si infilerebbe fra l'asse X e le icone,
+          // staccandole visivamente dai punti a cui corrispondono
+          legend: { display: true, position: opts.legendTop ? 'top' : 'bottom', labels: { color: colors.ink2, boxWidth: 18, boxHeight: 2, usePointStyle: false, font: { family: '"IBM Plex Sans", system-ui, sans-serif', size: 12 } } },
           tooltip: {
             backgroundColor: colors.surface, titleColor: colors.ink, bodyColor: colors.ink2, borderColor: colors.lineStrong, borderWidth: 1, padding: 8,
             titleFont: { family: '"IBM Plex Sans", system-ui, sans-serif', weight: '600' }, bodyFont: { family: '"IBM Plex Mono", monospace' },
@@ -525,6 +528,8 @@
   function loadMeteoPngs() {
     if (meteoPngsPromise) return meteoPngsPromise;
     const SIZE = 72;
+    // per ogni gruppo si tiene sia il PNG (per le celle della tabella, via addImage) sia l'immagine
+    // già decodificata (per disegnarla nella canvas del grafico, dove serve un elemento Image)
     meteoPngsPromise = Promise.all(Object.keys(METEO_ICON).map((k) => new Promise((resolve) => {
       const svg = METEO_ICON[k]
         .replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" ')
@@ -533,7 +538,7 @@
       img.onload = () => {
         const c = document.createElement('canvas'); c.width = c.height = SIZE;
         c.getContext('2d').drawImage(img, 0, 0, SIZE, SIZE);
-        resolve([k, c.toDataURL('image/png')]);
+        resolve([k, { url: c.toDataURL('image/png'), img }]);
       };
       img.onerror = () => resolve([k, null]);
       img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
@@ -560,19 +565,40 @@
     repGo.disabled = false;
   }
   function nextFrame() { return new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))); }
-  async function renderChartImage(series, day, per) {
+  // La striscia meteo del report viene disegnata dentro la stessa canvas del grafico, non dal lato PDF:
+  // così le x vengono direttamente da chart.scales.x.getPixelForValue(i) e l'allineamento con i punti non
+  // può sfasarsi. Disegnandola in punti tipografici bisognerebbe invece ricostruire i margini che Chart.js
+  // calcola a runtime (larghezza delle etichette Y, legenda), che cambiano da un inquinante all'altro.
+  const PDF_CHART_H = 480, PDF_STRIP_H = 74, PDF_CANVAS_W = 1500;
+  function drawMeteoStripOnCanvas(ctx, ch, series, st, art, H) {
+    const S = 30, top = H - PDF_STRIP_H + 14;
+    series.days.forEach((d, i) => {
+      const m = meteoDay(st.id, d);
+      if (!m) return;
+      const x = ch.scales.x.getPixelForValue(i);
+      const g = wmoGroup(m.wc);
+      if (g && art[g]) ctx.drawImage(art[g].img, x - S / 2, top, S, S);
+      const rl = rainLevel(m.pr);
+      if (rl) { ctx.fillStyle = RAIN_PDF[rl]; ctx.fillRect(x - S / 2, top + S + 5, S, 6); }
+    });
+  }
+  async function renderChartImage(series, day, per, st, art) {
     if (!series.n) return null;
+    const strip = per !== 'year' && !!(D.meteo && D.meteo[st.id]);
+    const W = PDF_CANVAS_W, H = PDF_CHART_H + (strip ? PDF_STRIP_H : 0);
     const canvas = document.createElement('canvas');
-    canvas.width = 1500; canvas.height = 560;
-    canvas.style.width = '1500px'; canvas.style.height = '560px';
+    canvas.width = W; canvas.height = H;
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
     canvas.style.position = 'fixed'; canvas.style.left = '-9999px'; canvas.style.top = '0';
     document.body.append(canvas);
-    const cfg = buildChartConfig(series, day, per, LIGHT, { responsive: false });
+    // la fascia in fondo viene riservata con il padding di layout, così Chart.js non ci disegna dentro
+    const cfg = buildChartConfig(series, day, per, LIGHT, { responsive: false, padBottom: strip ? PDF_STRIP_H : 0, legendTop: strip });
     const ch = new Chart(canvas, cfg);
     await nextFrame();
+    if (strip) drawMeteoStripOnCanvas(canvas.getContext('2d'), ch, series, st, art, H);
     const img = ch.toBase64Image('image/png', 1);
     ch.destroy(); canvas.remove();
-    return img;
+    return { img, ratio: W / H };
   }
   const slugify = (s) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   // il font "helvetica" standard di jsPDF (non incorporato) non rende alcuni caratteri Unicode:
@@ -659,8 +685,10 @@
         if (blocks.count && series.p.limit != null) parts.push('Giorni oltre ' + (series.p.kind === 'legge' ? 'il limite' : 'il riferimento OMS') + ' (' + series.p.limit + '): ' + series.over);
         doc.text(parts.join('   ·   '), M, y); y += 16;
         if (blocks.chart) {
-          const img = await renderChartImage(series, state.day, state.per);
-          if (img) { doc.addImage(img, 'PNG', M, y, pageW - 2 * M, 150); y += 164; }
+          const r = await renderChartImage(series, state.day, state.per, st, meteoPngs);
+          // l'altezza segue il rapporto reale della canvas: fissarla a un valore arbitrario schiacciava
+          // l'immagine (1500x480 dentro 515x150 significava comprimerla di un quarto in verticale)
+          if (r) { const w = pageW - 2 * M, h = Math.round(w / r.ratio); doc.addImage(r.img, 'PNG', M, y, w, h); y += h + 14; }
         }
         if (blocks.table) {
           const meteoRows = series.days.map((d) => meteoPdfRow(st.id, d));
@@ -689,7 +717,7 @@
               if (data.section !== 'body' || data.column.index !== 1) return;
               const mr = meteoRows[data.row.index];
               if (!mr) return;
-              if (mr.group && meteoPngs[mr.group]) doc.addImage(meteoPngs[mr.group], 'PNG', data.cell.x + 3, data.cell.y + (data.cell.height - 10) / 2, 10, 10);
+              if (mr.group && meteoPngs[mr.group]) doc.addImage(meteoPngs[mr.group].url, 'PNG', data.cell.x + 3, data.cell.y + (data.cell.height - 10) / 2, 10, 10);
               // barra larga quanto l'icona, non quanto la cella: a tutta larghezza si confonderebbe
               // con un filetto della tabella, e perderebbe la somiglianza con la striscia a schermo
               if (mr.rl) {
