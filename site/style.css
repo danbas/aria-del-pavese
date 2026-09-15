@@ -148,6 +148,10 @@ table.vals tr:hover td{background:var(--surface-2)}
 table.vals tr.sel td{background:var(--accent-soft)}
 table.vals tr.sel td:first-child{font-weight:600}
 table.vals td:first-child .cm{color:var(--muted);font-size:11px;font-weight:400;margin-left:6px}
+table.vals td.meteo{color:var(--ink-2);text-align:left}
+table.vals td.meteo svg{vertical-align:middle;margin-right:5px;color:var(--muted)}
+table.vals td.meteo .mt{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;font-size:12px}
+table.vals td.meteo.na{color:var(--line-strong);text-align:center}
 .thresholds{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:4px 18px;font-size:12px;color:var(--ink-2);margin-top:10px}
 .thresholds b{font-weight:600;color:var(--ink)}
 
@@ -164,6 +168,11 @@ table.vals td:first-child .cm{color:var(--muted);font-size:11px;font-weight:400;
 .chartbox{position:relative;height:300px}
 @media (max-width:600px){ .chartbox{height:240px} }
 .empty{color:var(--muted);padding:24px;text-align:center}
+.meteo-strip{display:flex;gap:1px;margin:4px 2px 0;overflow-x:auto}
+.meteo-strip .mday{flex:1 0 0;min-width:16px;display:flex;justify-content:center;align-items:center;color:var(--muted);cursor:pointer;border-radius:4px;padding:3px 0}
+.meteo-strip .mday:hover{background:var(--surface-2)}
+.meteo-strip .mday svg{color:var(--ink-2);flex:none}
+.meteo-strip .mday.na svg{visibility:hidden}
 
 /* report PDF */
 .rep-group{margin-bottom:12px}

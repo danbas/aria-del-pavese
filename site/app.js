@@ -237,16 +237,79 @@
     prov.setStyle({ color: css('--map-prov') });
   }
 
+  // ---------- meteo ----------
+  // Dati meteo storici: Open-Meteo (open-meteo.com), rianalisi ERA5/ERA5-Land di ECMWF, licenza CC BY 4.0.
+  // È il dato del punto griglia più vicino alla centralina (risoluzione ~9-25 km), non una misura fatta sul
+  // posto: utile come contesto meteorologico del giorno, non come misura ufficiale locale.
+  const WMO_LABEL = {
+    0: 'sereno', 1: 'prevalentemente sereno', 2: 'parzialmente nuvoloso', 3: 'coperto',
+    45: 'nebbia', 48: 'nebbia con brina',
+    51: 'pioviggine debole', 53: 'pioviggine moderata', 55: 'pioviggine intensa',
+    56: 'pioviggine gelata debole', 57: 'pioviggine gelata intensa',
+    61: 'pioggia debole', 63: 'pioggia moderata', 65: 'pioggia intensa',
+    66: 'pioggia gelata debole', 67: 'pioggia gelata intensa',
+    71: 'neve debole', 73: 'neve moderata', 75: 'neve intensa', 77: 'granelli di neve',
+    80: 'rovesci di pioggia deboli', 81: 'rovesci di pioggia moderati', 82: 'rovesci di pioggia violenti',
+    85: 'rovesci di neve deboli', 86: 'rovesci di neve moderati',
+    95: 'temporale', 96: 'temporale con grandine debole', 99: 'temporale con grandine forte',
+  };
+  function wmoGroup(wc) {
+    if (wc == null) return null;
+    if (wc <= 1) return 'sun';
+    if (wc === 2) return 'suncloud';
+    if (wc === 3) return 'cloud';
+    if (wc === 45 || wc === 48) return 'fog';
+    if (wc === 95 || wc === 96 || wc === 99) return 'storm';
+    if ((wc >= 71 && wc <= 77) || wc === 85 || wc === 86) return 'snow';
+    return 'rain'; // 51-67, 80-82
+  }
+  const METEO_ICON = {
+    sun: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M4.6 12H2.2M21.8 12h-2.4M5.8 5.8l1.7 1.7M16.5 16.5l1.7 1.7M18.2 5.8l-1.7 1.7M7.5 16.5l-1.7 1.7"/></svg>',
+    suncloud: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3.2"/><path d="M8 2.6v1.6M3.4 8H2M13.2 3.8l-1.1 1.1M3.9 12.9l1.1-1.1"/><path d="M8.5 12.5h8.3a3.2 3.2 0 0 0 0-6.4c-.5 0-.9.1-1.3.3A4.6 4.6 0 0 0 7 8.6"/></svg>',
+    cloud: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 17.5h11.3a3.7 3.7 0 0 0 0-7.4 4.2 4.2 0 0 0-1.4.24A5.3 5.3 0 0 0 6 12.4a3.7 3.7 0 0 0 .5 5.1z"/></svg>',
+    fog: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M5 8.5h9.3a3.2 3.2 0 0 0 0-6.4 3.6 3.6 0 0 0-1.2.2A4.6 4.6 0 0 0 4.5 4.6"/><path d="M3 13h18M3 16.5h18M3 20h18"/></svg>',
+    rain: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 12.5h11.3a3.7 3.7 0 0 0 0-7.4 4.2 4.2 0 0 0-1.4.24A5.3 5.3 0 0 0 6 7.4a3.7 3.7 0 0 0 .5 5.1z"/><path d="M8.5 16l-1.2 3M12.5 16l-1.2 3M16.5 16l-1.2 3"/></svg>',
+    snow: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 12.5h11.3a3.7 3.7 0 0 0 0-7.4 4.2 4.2 0 0 0-1.4.24A5.3 5.3 0 0 0 6 7.4a3.7 3.7 0 0 0 .5 5.1z"/><path d="M9 16.5v4M7 17.7l4 1.6M11 17.7l-4 1.6M15 16.5v4M13 17.7l4 1.6M17 17.7l-4 1.6"/></svg>',
+    storm: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 11.5h11.3a3.7 3.7 0 0 0 0-7.4 4.2 4.2 0 0 0-1.4.24A5.3 5.3 0 0 0 6 6.4a3.7 3.7 0 0 0 .5 5.1z"/><path d="M13 14l-3.2 4.6h2.6L11 22l4.4-5.4h-2.6z"/></svg>',
+  };
+  // dato meteo di una centralina in un giorno; null se assenti (fetch_meteo.py non ancora eseguito, o giorno
+  // non ancora pubblicato dall'archivio ERA5)
+  function meteoDay(stId, day) {
+    const stMeteo = D.meteo && D.meteo[stId]; if (!stMeteo) return null;
+    const { y, i } = dayIndex(day);
+    const ys = stMeteo[y]; if (!ys) return null;
+    const wc = ys.wc[i];
+    if (wc == null && ys.tmax[i] == null) return null;
+    return { wc, tmax: ys.tmax[i], tmin: ys.tmin[i], pr: ys.pr[i], wmax: ys.wmax[i], wg: ys.wg[i] };
+  }
+  const fmtT = (v) => v == null ? '—' : Math.round(v) + '°';
+  function meteoTitle(m) {
+    const label = m.wc != null ? (WMO_LABEL[m.wc] || 'n/d') : 'n/d';
+    return `Meteo: ${label}` +
+      (m.tmax != null || m.tmin != null ? ` · ${fmtT(m.tmax)} / ${fmtT(m.tmin)}` : '') +
+      (m.pr != null ? ` · precipitazioni ${m.pr.toFixed(1)} mm` : '') +
+      (m.wmax != null ? ` · vento max ${Math.round(m.wmax)} km/h` : '') +
+      (m.wg != null ? ` (raffiche ${Math.round(m.wg)} km/h)` : '') +
+      ' · dato Open-Meteo (rianalisi ERA5/ERA5-Land, non una misura in loco)';
+  }
+  function meteoCellHtml(stId, day) {
+    const m = meteoDay(stId, day);
+    if (!m) return '<td class="meteo na">·</td>';
+    const group = wmoGroup(m.wc);
+    const icon = group ? METEO_ICON[group] : '';
+    return `<td class="meteo" title="${meteoTitle(m)}">${icon}<span class="mt">${fmtT(m.tmax)}/${fmtT(m.tmin)}</span></td>`;
+  }
+
   // ---------- values table ----------
   const table = $('#vals');
   function syncTable() {
     const vis = STATIONS.filter((s) => state.visible.has(s.id));
     const cols = D.order.filter((p) => vis.some((st) => st.sensors.some((sid) => SENS[sid].p === p)));
     if (!vis.length) { table.innerHTML = '<tr><td class="empty">Nessuna centralina selezionata.</td></tr>'; $('#thr').innerHTML = ''; return; }
-    let h = '<thead><tr><th>Centralina</th>' + cols.map((p) => `<th>${POLL[p].label}<small>${metricLabel(p)}</small></th>`).join('') + '</tr></thead><tbody>';
+    let h = '<thead><tr><th>Centralina</th><th>Meteo</th>' + cols.map((p) => `<th>${POLL[p].label}<small>${metricLabel(p)}</small></th>`).join('') + '</tr></thead><tbody>';
     for (const st of vis) {
       const { rows } = stationDay(st, state.day);
-      h += `<tr data-id="${st.id}" class="${st.id === state.sel ? 'sel' : ''}" tabindex="0"><td>${st.name}<span class="cm">${st.comune}</span></td>`;
+      h += `<tr data-id="${st.id}" class="${st.id === state.sel ? 'sel' : ''}" tabindex="0"><td>${st.name}<span class="cm">${st.comune}</span></td>` + meteoCellHtml(st.id, state.day);
       for (const p of cols) {
         const cand = rows.filter((r) => r.pcode === p);
         if (!cand.length) { h += '<td class="na">·</td>'; continue; }
@@ -382,11 +445,26 @@
       `<span>Media del periodo <b>${mean == null ? '—' : fmtV(mean, state.pol)}</b> ${unit}</span>` +
       `<span>Massimo <b>${max == null ? '—' : fmtV(max, state.pol)}</b> ${unit}</span>` +
       (p.limit != null ? `<span>Giorni oltre ${p.kind === 'legge' ? 'il limite' : 'il riferimento OMS'} (${p.limit}) <b class="${over ? 'crit' : ''}">${over}</b></span>` : '<span>Nessuna soglia giornaliera</span>');
-    const empty = $('#chart-empty'), box = $('.chartbox');
-    if (!n) { empty.hidden = false; empty.textContent = 'Nessun dato per ' + p.label + ' a ' + st.name + ' in questo periodo.'; box.hidden = true; if (chart) { chart.destroy(); chart = null; } return; }
+    const empty = $('#chart-empty'), box = $('.chartbox'), mstrip = $('#meteo-strip');
+    if (!n) { empty.hidden = false; empty.textContent = 'Nessun dato per ' + p.label + ' a ' + st.name + ' in questo periodo.'; box.hidden = true; mstrip.hidden = true; if (chart) { chart.destroy(); chart = null; } return; }
     empty.hidden = true; box.hidden = false;
     const cfg = buildChartConfig(series, state.day, state.per, themeColors());
     if (chart) { chart.config.data = cfg.data; chart.config.options = cfg.options; chart.update(); } else chart = new Chart($('#chart'), cfg);
+    syncMeteoStrip(mstrip, st, days, state.per);
+  }
+  // striscia di icone meteo sotto il grafico, allineata ai giorni del periodo: mostrata solo per
+  // settimana/mese (per l'anno sarebbero ~365 icone, troppo dense per essere leggibili)
+  function syncMeteoStrip(mstrip, st, days, per) {
+    if (per === 'year' || !D.meteo || !D.meteo[st.id]) { mstrip.hidden = true; mstrip.innerHTML = ''; return; }
+    mstrip.hidden = false;
+    mstrip.innerHTML = days.map((d) => {
+      const m = meteoDay(st.id, d);
+      if (!m) return `<div class="mday na" title="Meteo non disponibile"><svg viewBox="0 0 24 24" width="16" height="16"></svg></div>`;
+      const group = wmoGroup(m.wc);
+      const icon = group ? METEO_ICON[group] : '<svg viewBox="0 0 24 24" width="16" height="16"></svg>';
+      return `<div class="mday" title="${fmtShort(d)} — ${meteoTitle(m)}">${icon}</div>`;
+    }).join('');
+    mstrip.querySelectorAll('.mday').forEach((el, i) => el.addEventListener('click', () => { const d = days[i]; if (d >= MIN_DAY && d <= MAX_DAY) setDay(d); }));
   }
 
   // ---------- report PDF ----------
@@ -470,6 +548,12 @@
   // µ e ³ restano invisibili, i pedici ₂ ₃ ₓ vengono sostituiti con glifi sbagliati. Si sostituiscono
   // con equivalenti ASCII solo nel testo destinato al PDF (a schermo restano quelli tipografici corretti).
   const pdfSafe = (s) => String(s).replace(/µ/g, 'u').replace(/³/g, '3').replace(/₂/g, '2').replace(/₃/g, '3').replace(/ₓ/g, 'x');
+  function meteoPdfText(stId, day) {
+    const m = meteoDay(stId, day);
+    if (!m) return '—';
+    const label = m.wc != null ? (WMO_LABEL[m.wc] || 'n/d') : 'n/d';
+    return pdfSafe(label) + '  ' + fmtT(m.tmax) + '/' + fmtT(m.tmin);
+  }
   async function buildReportPdf() {
     const st = stById[state.sel];
     if (!st || !reportState.pols.size) { repStatus.textContent = 'Seleziona almeno un inquinante.'; return; }
@@ -515,7 +599,7 @@
       doc.setTextColor(LIGHT.accent);
       doc.textWithLink(SITE_URL.replace(/^https:\/\//, ''), M, y, { url: SITE_URL }); y += 16;
       if (blocks.meta) {
-        const note = 'Fonte: ARPA Lombardia, dati delle centraline di monitoraggio della qualità dell\'aria, open data su dati.lombardia.it, licenza CC0 1.0 (pubblico dominio), attribuzione «ARPA LOMBARDIA». Sono usati solo i valori con stato «validato» (VA); questo indica una lettura passata al controllo qualità automatico di ARPA, non che il dato sia definitivo: i dati dell\'anno in corso (e, fino al 30 marzo, quelli dell\'anno precedente) restano provvisori e ARPA può ancora rivederli retroattivamente. I limiti sono quelli del D.Lgs. 155/2010; per il PM2.5, che ha solo un limite annuale, la soglia giornaliera mostrata è la linea guida OMS 2021 (15 µg/m³) e non un limite di legge. Le aggregazioni giornaliere e i conteggi dei superamenti sono elaborazioni proprie di questo progetto indipendente, non affiliato ad ARPA Lombardia; per usi ufficiali fare riferimento ad ARPA.';
+        const note = 'Fonte: ARPA Lombardia, dati delle centraline di monitoraggio della qualità dell\'aria, open data su dati.lombardia.it, licenza CC0 1.0 (pubblico dominio), attribuzione «ARPA LOMBARDIA». Sono usati solo i valori con stato «validato» (VA); questo indica una lettura passata al controllo qualità automatico di ARPA, non che il dato sia definitivo: i dati dell\'anno in corso (e, fino al 30 marzo, quelli dell\'anno precedente) restano provvisori e ARPA può ancora rivederli retroattivamente. I limiti sono quelli del D.Lgs. 155/2010; per il PM2.5, che ha solo un limite annuale, la soglia giornaliera mostrata è la linea guida OMS 2021 (15 µg/m³) e non un limite di legge. Le informazioni meteo (colonna «Meteo») provengono da Open-Meteo (open-meteo.com), rianalisi ERA5/ERA5-Land di ECMWF, licenza CC BY 4.0: è il dato del punto griglia più vicino alla centralina (risoluzione ~9-25 km), non una misura fatta sul posto. Le aggregazioni giornaliere e i conteggi dei superamenti sono elaborazioni proprie di questo progetto indipendente, non affiliato ad ARPA Lombardia né a Open-Meteo; per usi ufficiali fare riferimento alle fonti primarie.';
         doc.setTextColor(LIGHT.muted);
         const lines = doc.splitTextToSize(pdfSafe(note), pageW - 2 * M);
         doc.setFontSize(8.5); doc.text(lines, M, y); y += lines.length * 10 + 6;
@@ -549,11 +633,11 @@
           const rows = series.days.map((d, idx) => {
             const v = series.vals[idx];
             const lv = (v != null && series.p.limit != null && v > series.p.limit) ? (series.p.kind === 'legge' ? 'law' : 'who') : null;
-            return { cells: [fmtLong(d), v == null ? '—' : fmtV(v, pcodes[i]) + ' ' + unit, lv === 'law' ? 'Oltre il limite di legge' : lv === 'who' ? 'Oltre il riferimento OMS' : ''], lv };
+            return { cells: [fmtLong(d), meteoPdfText(st.id, d), v == null ? '—' : fmtV(v, pcodes[i]) + ' ' + unit, lv === 'law' ? 'Oltre il limite di legge' : lv === 'who' ? 'Oltre il riferimento OMS' : ''], lv };
           });
           doc.autoTable({
             startY: y, margin: { left: M, right: M },
-            head: [['Data', 'Valore', 'Esito']],
+            head: [['Data', 'Meteo', 'Valore', 'Esito']],
             body: rows.map((r) => r.cells),
             styles: { font: 'helvetica', fontSize: 8.5, cellPadding: 3, textColor: LIGHT.ink2 },
             headStyles: { fillColor: LIGHT.ink, textColor: '#ffffff', fontStyle: 'bold' },

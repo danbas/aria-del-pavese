@@ -4,6 +4,15 @@ on:
   schedule:
     - cron: '30 5 * * *'   # ogni giorno alle 05:30 UTC (07:30 ora italiana estiva)
   workflow_dispatch:
+    inputs:
+      meteo_years:
+        description: >-
+          Anni meteo da (ri)scaricare da Open-Meteo. Lasciare il default per l'aggiornamento normale;
+          usare "all" una tantum per il backfill iniziale di tutta la finestra di dieci anni (richiede
+          qualche minuto in più, scarica ~10 anni × 13 centraline in un'unica chiamata).
+        default: 'current,previous'
+        required: false
+        type: string
   push:
     branches: [main]
     paths-ignore: ['README.md']
@@ -31,6 +40,9 @@ jobs:
         env:
           SOCRATA_APP_TOKEN: ${{ secrets.SOCRATA_APP_TOKEN }}
         run: python scripts/fetch_arpa.py --years current,previous
+
+      - name: Scarica i dati meteo storici (Open-Meteo)
+        run: python scripts/fetch_meteo.py --years "${{ inputs.meteo_years || 'current,previous' }}"
 
       - name: Costruisci site/data.js
         run: python scripts/build_data.py

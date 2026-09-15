@@ -76,6 +76,34 @@ for sid, ysd in series.items():
             if p: arr['p'] = p
         del arr['n']
 
+# meteo: stazione -> anno -> {wc, tmax, tmin, pr, wmax, wg} (indice = giorno dell'anno - 1), stesso schema
+# di 'series' ma per centralina invece che per sensore. Fonte: Open-Meteo (open-meteo.com), rianalisi
+# ERA5/ERA5-Land di ECMWF, licenza CC BY 4.0 — è il dato del punto griglia più vicino alla centralina
+# (risoluzione ~9-25 km), non una misura fatta sul posto. File opzionali: se mancano (fetch_meteo.py non
+# ancora eseguito) il bundle resta valido, semplicemente senza il campo 'meteo'.
+meteo_files = {}
+for f in glob.glob(D + 'meteo-pv-20??.json') + glob.glob(D + 'open' + os.sep + 'meteo-pv-20??.json'):
+    y = int(f[-9:-5])
+    if y >= FIRST_YEAR: meteo_files.setdefault(y, f)   # data/open ha la precedenza (è il più fresco)
+meteo = collections.defaultdict(dict)
+# I valori meteo vengono arrotondati qui, non nei file sorgente (che restano fedeli a quanto risponde l'API):
+# la pagina mostra comunque temperature e vento come interi e le precipitazioni con un decimale, quindi a schermo
+# non cambia nulla, mentre il bundle scende di circa un terzo sulla parte meteo. Un float intero viene scritto
+# come intero (0 invece di 0.0): le giornate senza pioggia sono la maggioranza e risparmiano due caratteri l'una.
+def r0(v): return None if v is None else int(round(v))
+def r1(v):
+    if v is None: return None
+    v = round(v, 1)
+    return int(v) if v == int(v) else v
+for y in sorted(meteo_files):
+    d = json.load(open(meteo_files[y]))
+    ndays = 366 if (y % 4 == 0 and (y % 100 != 0 or y % 400 == 0)) else 365
+    for sid, day, wc, tmax, tmin, pr, wmax, wg in d['rows']:
+        if sid not in stations: continue   # centralina fuori dalla finestra corrente: meteo non utile
+        i = datetime.date.fromisoformat(day).timetuple().tm_yday - 1
+        ys = meteo[sid].setdefault(y, dict(wc=[None]*ndays, tmax=[None]*ndays, tmin=[None]*ndays, pr=[None]*ndays, wmax=[None]*ndays, wg=[None]*ndays))
+        ys['wc'][i] = wc; ys['tmax'][i] = r0(tmax); ys['tmin'][i] = r0(tmin); ys['pr'][i] = r1(pr); ys['wmax'][i] = r0(wmax); ys['wg'][i] = r0(wg)
+
 # sort station sensors by pollutant order
 for st in stations.values():
     st['sensors'].sort(key=lambda sid: (ORDER.index(sensors[sid]['p']), sensors[sid]['start']))
@@ -89,6 +117,7 @@ bundle = dict(
     stations=sorted(stations.values(), key=lambda s: s['name']),
     sensors=sensors,
     series={str(k): v for k, v in series.items()},
+    meteo={str(k): {str(y): v for y, v in yd.items()} for k, yd in meteo.items()},
     geo=json.load(open(D + 'comuni_pv.geojson')),
     prov=json.load(open(D + 'provincia_pv.geojson')),
 )
