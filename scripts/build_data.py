@@ -123,4 +123,14 @@ bundle = dict(
 )
 js = 'window.ARPA_DATA=' + json.dumps(bundle, ensure_ascii=False, separators=(',', ':')) + ';'
 open(OUT, 'w').write(js)
+
+# Sitemap: una sola pagina, con lastmod pari all'ultimo giorno di dati (non alla data di build: il file
+# viene riscritto ogni notte, ma la pagina cambia davvero solo quando arrivano dati nuovi). Va sottomessa
+# da Google Search Console: robots.txt vale solo alla radice dell'host, che questo repository non serve.
+SITE_URL = os.environ.get('SITE_URL', 'https://danbas.github.io/aria-del-pavese/')
+open(os.path.join(os.path.dirname(OUT), 'sitemap.xml'), 'w').write(
+    '<?xml version="1.0" encoding="UTF-8"?>\n'
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    f'  <url>\n    <loc>{SITE_URL}</loc>\n    <lastmod>{maxday}</lastmod>\n'
+    '    <changefreq>daily</changefreq>\n  </url>\n</urlset>\n')
 print('window', FIRST_YEAR, '-', years[-1], 'stations', len(stations), 'sensors', len(sensors), 'range', minday, maxday, 'bytes', len(js.encode()))

@@ -1,4 +1,5 @@
 site/data.js
+site/sitemap.xml
 data/open/
 __pycache__/
 .DS_Store
