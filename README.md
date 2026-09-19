@@ -14,6 +14,8 @@ superamenti dei limiti di legge in evidenza, andamento per stazione su settimana
 > **Progetto indipendente.** Non è un sito ufficiale e non è affiliato ad ARPA Lombardia, a Regione Lombardia né ad alcun ente
 > locale. Le elaborazioni sono proprie del progetto; per usi ufficiali fare riferimento ai dati ARPA.
 
+Fratello di [Fiumi di Lombardia](https://github.com/danbas/fiumi-di-lombardia), con cui condivide impostazione, stile e pipeline.
+
 ## Perché
 
 Il progetto nasce da una domanda semplice: *com'era l'aria in provincia di Pavia in un certo giorno, e dove?*

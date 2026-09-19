@@ -15,6 +15,8 @@ every night. The user interface is in Italian.
 > **Independent project.** This is not an official site and is not affiliated with ARPA Lombardia, Regione Lombardia or any
 > local authority. The computations are the project's own; for official purposes refer to ARPA data.
 
+Sibling of [Fiumi di Lombardia](https://github.com/danbas/fiumi-di-lombardia), sharing its approach, style and pipeline.
+
 ## Why
 
 The project starts from a simple question: *how was the air in the province of Pavia on a given day, and where?* ARPA publishes
